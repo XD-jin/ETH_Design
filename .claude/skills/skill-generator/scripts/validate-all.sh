@@ -1,0 +1,275 @@
+#!/bin/bash
+# validate-all.sh - Run all skill validators
+#
+# Usage: validate-all.sh <skill-directory> [--verbose] [--json]
+#
+# Runs:
+# - validate-structure.sh
+# - validate-frontmatter.sh
+# - count-tokens.py
+# - validate-skill.sh (if exists)
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# Results tracking
+declare -A RESULTS
+TOTAL_ERRORS=0
+
+usage() {
+    echo "Usage: $0 <skill-directory> [--verbose] [--json]"
+    echo ""
+    echo "Run all validators on a skill directory."
+    echo ""
+    echo "Options:"
+    echo "  -v, --verbose  Show detailed output from each validator"
+    echo "  --json         Output results as JSON"
+    echo "  -h, --help     Show this help message"
+    exit 1
+}
+
+# Parse arguments
+VERBOSE=false
+JSON_OUTPUT=false
+CHECK_DEPS=false
+SKILL_DIR=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -h|--help)
+            usage
+            ;;
+        -v|--verbose)
+            VERBOSE=true
+            shift
+            ;;
+        --json)
+            JSON_OUTPUT=true
+            shift
+            ;;
+        --check-deps)
+            CHECK_DEPS=true
+            shift
+            ;;
+        *)
+            SKILL_DIR="$1"
+            shift
+            ;;
+    esac
+done
+
+if [[ -z "$SKILL_DIR" ]]; then
+    echo -e "${RED}Error:${NC} Skill directory required" >&2
+    usage
+fi
+
+# Resolve to absolute path
+SKILL_DIR=$(cd "$SKILL_DIR" 2>/dev/null && pwd) || {
+    echo -e "${RED}Error:${NC} Directory does not exist: $SKILL_DIR" >&2
+    exit 1
+}
+
+SKILL_NAME=$(basename "$SKILL_DIR")
+
+run_validator() {
+    local name="$1"
+    local cmd="$2"
+
+    if ! $JSON_OUTPUT; then
+        echo -e "\n${BLUE}[$name]${NC}"
+    fi
+
+    if $VERBOSE; then
+        if eval "$cmd"; then
+            RESULTS[$name]="PASS"
+            return 0
+        else
+            RESULTS[$name]="FAIL"
+            ((TOTAL_ERRORS++)) || true
+            return 1
+        fi
+    else
+        # Capture output
+        local output
+        if output=$(eval "$cmd" 2>&1); then
+            RESULTS[$name]="PASS"
+            if ! $JSON_OUTPUT; then
+                echo -e "${GREEN}✓ PASSED${NC}"
+            fi
+            return 0
+        else
+            RESULTS[$name]="FAIL"
+            ((TOTAL_ERRORS++)) || true
+            if ! $JSON_OUTPUT; then
+                echo -e "${RED}✗ FAILED${NC}"
+                # Show last few lines of output
+                echo "$output" | tail -5 | sed 's/^/  /'
+            fi
+            return 1
+        fi
+    fi
+}
+
+if ! $JSON_OUTPUT; then
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "Validating Skill: $SKILL_NAME"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+fi
+
+# Track overall status
+OVERALL_PASS=true
+
+# 1. Structure validation
+if [[ -x "$SCRIPT_DIR/validate-structure.sh" ]]; then
+    run_validator "Structure" "$SCRIPT_DIR/validate-structure.sh '$SKILL_DIR'" || OVERALL_PASS=false
+else
+    if ! $JSON_OUTPUT; then
+        echo -e "\n${YELLOW}[Structure]${NC} Skipped - validator not found"
+    fi
+    RESULTS["Structure"]="SKIP"
+fi
+
+# 2. Frontmatter validation
+if [[ -x "$SCRIPT_DIR/validate-frontmatter.sh" ]]; then
+    run_validator "Frontmatter" "$SCRIPT_DIR/validate-frontmatter.sh '$SKILL_DIR'" || OVERALL_PASS=false
+else
+    if ! $JSON_OUTPUT; then
+        echo -e "\n${YELLOW}[Frontmatter]${NC} Skipped - validator not found"
+    fi
+    RESULTS["Frontmatter"]="SKIP"
+fi
+
+# 3. Token count validation
+if [[ -x "$SCRIPT_DIR/count-tokens.py" ]]; then
+    run_validator "Tokens" "python3 '$SCRIPT_DIR/count-tokens.py' '$SKILL_DIR'" || OVERALL_PASS=false
+elif command -v python3 &>/dev/null && [[ -f "$SCRIPT_DIR/count-tokens.py" ]]; then
+    run_validator "Tokens" "python3 '$SCRIPT_DIR/count-tokens.py' '$SKILL_DIR'" || OVERALL_PASS=false
+else
+    if ! $JSON_OUTPUT; then
+        echo -e "\n${YELLOW}[Tokens]${NC} Skipped - Python not available"
+    fi
+    RESULTS["Tokens"]="SKIP"
+fi
+
+# 4. Main skill validation (if exists)
+if [[ -x "$SCRIPT_DIR/validate-skill.sh" ]]; then
+    run_validator "Skill" "$SCRIPT_DIR/validate-skill.sh '$SKILL_DIR'" || OVERALL_PASS=false
+else
+    RESULTS["Skill"]="SKIP"
+fi
+
+# 5. Script validation (if scripts exist)
+SCRIPTS_DIR="$SKILL_DIR/scripts"
+if [[ -d "$SCRIPTS_DIR" ]]; then
+    # Check bash scripts with shellcheck
+    # -S warning: Only fail on warnings and errors, not style suggestions
+    if command -v shellcheck &>/dev/null; then
+        SHELL_SCRIPTS=$(find "$SCRIPTS_DIR" -name "*.sh" -type f 2>/dev/null | tr '\n' ' ')
+        if [[ -n "${SHELL_SCRIPTS// /}" ]]; then
+            # Detect snap-confined shellcheck which cannot access /tmp or other confined paths.
+            # Test with the first script file to see if shellcheck can actually read it.
+            FIRST_SCRIPT="${SHELL_SCRIPTS%% *}"
+            if shellcheck --severity=error "$FIRST_SCRIPT" >/dev/null 2>&1 || [[ $? -eq 1 ]]; then
+                # Probe succeeded: file is readable (exit 0 = clean, exit 1 = warnings found)
+                run_validator "Shellcheck" "shellcheck -S warning -s bash $SHELL_SCRIPTS" || OVERALL_PASS=false
+            else
+                # Probe failed: file not accessible (exit 2 = file access error)
+                if ! $JSON_OUTPUT; then
+                    echo -e "\n${YELLOW}[Shellcheck]${NC} Skipped - shellcheck cannot access $SCRIPTS_DIR (snap confinement)"
+                fi
+                RESULTS["Shellcheck"]="SKIP"
+            fi
+        fi
+    fi
+
+    # Check Python scripts with syntax check
+    PY_SCRIPTS=$(find "$SCRIPTS_DIR" -name "*.py" -type f 2>/dev/null | tr '\n' ' ')
+    if [[ -n "${PY_SCRIPTS// /}" ]]; then
+        run_validator "Python Syntax" "python3 -m py_compile $PY_SCRIPTS" || OVERALL_PASS=false
+    fi
+fi
+
+# 6. Dependency check (optional, non-blocking)
+if $CHECK_DEPS && [[ -x "$SCRIPT_DIR/check-dependencies.sh" ]]; then
+    run_validator "Dependencies" "$SCRIPT_DIR/check-dependencies.sh '$SKILL_DIR'" || OVERALL_PASS=false
+fi
+
+# 7. Quality score (advisory — shows score but does not block)
+if [[ -f "$SCRIPT_DIR/score-skill.py" ]] && command -v python3 &>/dev/null; then
+    if ! $JSON_OUTPUT; then
+        SCORE_OUTPUT=$(python3 "$SCRIPT_DIR/score-skill.py" "$SKILL_DIR" --json 2>/dev/null || echo "")
+        if [[ -n "$SCORE_OUTPUT" ]]; then
+            QUALITY_SCORE=$(echo "$SCORE_OUTPUT" | python3 -c "import sys,json; print(json.load(sys.stdin)['overall_score'])" 2>/dev/null || echo "")
+            QUALITY_REC=$(echo "$SCORE_OUTPUT" | python3 -c "import sys,json; print(json.load(sys.stdin)['recommendation'])" 2>/dev/null || echo "")
+            if [[ -n "$QUALITY_SCORE" ]]; then
+                echo -e "\n${BLUE}[Quality]${NC}"
+                echo -e "  Score: ${QUALITY_SCORE}/10 (${QUALITY_REC})"
+                RESULTS["Quality"]="$QUALITY_REC"
+            fi
+        fi
+    fi
+fi
+
+# Output results
+if $JSON_OUTPUT; then
+    # JSON output
+    echo "{"
+    echo "  \"skill_name\": \"$SKILL_NAME\","
+    echo "  \"passed\": $( $OVERALL_PASS && echo "true" || echo "false" ),"
+    echo "  \"validators\": {"
+    first=true
+    for key in "${!RESULTS[@]}"; do
+        $first || echo ","
+        first=false
+        echo -n "    \"$key\": \"${RESULTS[$key]}\""
+    done
+    echo ""
+    echo "  },"
+    echo "  \"total_errors\": $TOTAL_ERRORS"
+    echo "}"
+else
+    # Human-readable summary
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "Validation Summary"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+
+    for key in "${!RESULTS[@]}"; do
+        case "${RESULTS[$key]}" in
+            PASS)
+                echo -e "  ${GREEN}✓${NC} $key"
+                ;;
+            FAIL)
+                echo -e "  ${RED}✗${NC} $key"
+                ;;
+            SKIP)
+                echo -e "  ${YELLOW}○${NC} $key (skipped)"
+                ;;
+        esac
+    done
+
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    if $OVERALL_PASS; then
+        echo -e "${GREEN}✓ ALL VALIDATIONS PASSED${NC}"
+        echo ""
+        echo "Skill '$SKILL_NAME' is ready for installation."
+    else
+        echo -e "${RED}✗ VALIDATION FAILED${NC}"
+        echo ""
+        echo "Fix the errors above before installation."
+    fi
+fi
+
+# Exit with appropriate code
+$OVERALL_PASS && exit 0 || exit 1

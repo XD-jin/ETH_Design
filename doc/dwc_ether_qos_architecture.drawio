@@ -1,0 +1,422 @@
+<mxGraphModel adaptiveColors="auto" grid="0" guides="0" tooltips="0" connect="0">
+  <root>
+    <mxCell id="0"/>
+    <mxCell id="1" parent="0"/>
+
+    <!-- ====== APPLICATION SYSTEM (Left) ====== -->
+    <mxCell id="zone_app" value="" style="rounded=0;shadow=0;gradient=none;fillColor=none;strokeColor=#FF0000;strokeWidth=1;dashed=1;dashPattern=4 4;" vertex="1" parent="1">
+      <mxGeometry x="20" y="30" width="340" height="290" as="geometry"/>
+    </mxCell>
+    <mxCell id="lbl_app" value="Application System" style="text;fontColor=#000000;fontName=Arial;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="110" y="320" width="160" height="18" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="cpu" value="&lt;b&gt;CPU / Software Driver&lt;/b&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#C6E2FF;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="60" y="60" width="260" height="44" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="sysmem" value="&lt;b&gt;System Memory&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Descriptor Rings: up to 8 Tx + 8 Rx&lt;br&gt;Data Buffers: up to 32KB per descriptor&lt;/font&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#C6E2FF;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="60" y="130" width="260" height="60" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="bus" value="&lt;b&gt;AHB / AXI Application Bus&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;32 / 64 / 128 bit&lt;/font&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#FFE0B2;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="60" y="230" width="260" height="44" as="geometry"/>
+    </mxCell>
+
+    <!-- ====== DWC_ether_qos CORE ZONE (Center-Left to Center-Right) ====== -->
+    <mxCell id="zone_core" value="" style="rounded=0;shadow=0;gradient=none;fillColor=none;strokeColor=#FF0000;strokeWidth=1;dashed=1;dashPattern=4 4;" vertex="1" parent="1">
+      <mxGeometry x="400" y="30" width="1100" height="430" as="geometry"/>
+    </mxCell>
+    <mxCell id="lbl_core" value="DWC_ether_qos Controller" style="text;fontColor=#000000;fontName=Arial;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="840" y="460" width="220" height="18" as="geometry"/>
+    </mxCell>
+
+    <!-- === COLUMN 1: CSR === -->
+    <mxCell id="csr" value="&lt;b&gt;CSR Slave I/F&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px&quot;&gt;AHB / APB3/4&lt;br&gt;AXI3 / AXI4-Lite&lt;br&gt;MAC+MTL+DMA Reg&lt;/font&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#FFE0B2;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="430" y="60" width="140" height="80" as="geometry"/>
+    </mxCell>
+
+    <!-- === COLUMN 2: DMA === -->
+    <mxCell id="dma_tx" value="&lt;b&gt;Tx DMA&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px&quot;&gt;up to 8 channels&lt;br&gt;Desc Fetch / Read&lt;br&gt;OSP / TSO / UFO&lt;/font&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#C6E2FF;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="620" y="60" width="110" height="85" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="dma_rx" value="&lt;b&gt;Rx DMA&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px&quot;&gt;up to 8 channels&lt;br&gt;Desc Fetch / Write&lt;br&gt;Header-Payload Split&lt;/font&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#C6E2FF;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="620" y="175" width="110" height="85" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="dma_arb" value="&lt;b&gt;Arbiter&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px&quot;&gt;RR / Fixed&lt;/font&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#FFE0B2;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="620" y="285" width="110" height="35" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="dma_intr" value="&lt;b&gt;Interrupt Ctrl&lt;/b&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#FFE0B2;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="620" y="340" width="110" height="35" as="geometry"/>
+    </mxCell>
+
+    <!-- === COLUMN 3: MTL === -->
+    <mxCell id="mtl_txq" value="&lt;b&gt;Tx Queues&lt;/b&gt; (up to 8)&lt;br&gt;&lt;font style=&quot;font-size:8px&quot;&gt;SRAM: 256B ~ 128KB&lt;br&gt;S&amp;F / Threshold&lt;br&gt;ATI Interface&lt;/font&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#C6E2FF;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="780" y="60" width="130" height="85" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="mtl_rxq" value="&lt;b&gt;Rx Queues&lt;/b&gt; (up to 8)&lt;br&gt;&lt;font style=&quot;font-size:8px&quot;&gt;SRAM: 256B ~ 256KB&lt;br&gt;S&amp;F / Threshold&lt;br&gt;ARI Interface&lt;/font&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#C6E2FF;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="780" y="175" width="130" height="85" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="mtl_txarb" value="&lt;b&gt;Tx Scheduler&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:7px&quot;&gt;WRR / DWRR / WFQ / SP&lt;br&gt;CBS (AVB) / EST (TSN) / TBS&lt;/font&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#FFE0B2;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="780" y="285" width="130" height="42" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="mtl_rxarb" value="&lt;b&gt;Rx Scheduler&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:7px&quot;&gt;WRR / WSP / SP&lt;/font&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#FFE0B2;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="780" y="343" width="130" height="32" as="geometry"/>
+    </mxCell>
+
+    <!-- === COLUMN 4: MAC === -->
+    <mxCell id="mac_tx" value="&lt;b&gt;MAC TX Path&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:7px&quot;&gt;TBU → TPC → TPE → TxMAC&lt;br&gt;CRC-32 Gen | PAD Gen&lt;br&gt;Preamble+SFD Insert&lt;/font&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#C6E2FF;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="960" y="60" width="130" height="85" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="mac_rx" value="&lt;b&gt;MAC RX Path&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:7px&quot;&gt;RxMAC → CRC Chk → RPC → RBI&lt;br&gt;Preamble+SFD Strip&lt;br&gt;PAD Strip | Watchdog&lt;/font&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#C6E2FF;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="960" y="175" width="130" height="85" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="mac_vlan" value="&lt;b&gt;VLAN&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:7px&quot;&gt;Ins/Del/Replace&lt;br&gt;up to 2 Tags&lt;/font&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#FFE0B2;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="960" y="285" width="60" height="42" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="mac_1588" value="&lt;b&gt;1588 TS&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:7px&quot;&gt;1/2-step&lt;br&gt;64-bit&lt;/font&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#FFE0B2;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="1030" y="285" width="60" height="42" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="mac_flt" value="&lt;b&gt;Addr Filter&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:7px&quot;&gt;31DA/31SA&lt;/font&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#FFE0B2;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="960" y="343" width="60" height="32" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="mac_fpe" value="&lt;b&gt;FPE&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:7px&quot;&gt;802.1Qbu&lt;/font&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#FFE0B2;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="1030" y="343" width="60" height="32" as="geometry"/>
+    </mxCell>
+
+    <!-- === COLUMN 5: PHY I/F + External PHY === -->
+    <mxCell id="zone_phy" value="" style="rounded=0;shadow=0;gradient=none;fillColor=none;strokeColor=#FF0000;strokeWidth=1;dashed=1;dashPattern=4 4;" vertex="1" parent="1">
+      <mxGeometry x="1540" y="30" width="200" height="430" as="geometry"/>
+    </mxCell>
+    <mxCell id="lbl_phy" value="Ethernet PHY" style="text;fontColor=#000000;fontName=Arial;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1590" y="460" width="100" height="18" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="phy_mux" value="&lt;b&gt;PHY I/F MUX&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px&quot;&gt;Selectable at reset&lt;/font&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#FFE0E0;strokeColor=#FF0000;strokeWidth=1;dashed=1;dashPattern=4 4;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="1140" y="110" width="110" height="46" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="ext_phy" value="&lt;b&gt;External PHY&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;10/100/1000 Mbps&lt;br&gt;RJ45 / SFP / Fiber&lt;/font&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#C6E2FF;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="1570" y="80" width="140" height="80" as="geometry"/>
+    </mxCell>
+
+    <!-- PHY type labels inside PHY zone -->
+    <mxCell id="phy_list" value="&lt;b&gt;Supported PHY Interfaces:&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;GMII/MII (default) | RGMII v2.6&lt;br&gt;SGMII v1.8 | RMII v1.2&lt;br&gt;TBI/RTBI | SMII v2.1 | RevMII&lt;/font&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#FFF5E6;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="1570" y="200" width="140" height="70" as="geometry"/>
+    </mxCell>
+
+    <!-- ====== AUXILIARY ZONE (Bottom) ====== -->
+    <mxCell id="zone_aux" value="" style="rounded=0;shadow=0;gradient=none;fillColor=none;strokeColor=#FF0000;strokeWidth=1;dashed=1;dashPattern=4 4;" vertex="1" parent="1">
+      <mxGeometry x="400" y="490" width="1100" height="130" as="geometry"/>
+    </mxCell>
+    <mxCell id="lbl_aux" value="Supporting Modules &amp; Auxiliary Functions" style="text;fontColor=#000000;fontName=Arial;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="810" y="620" width="280" height="18" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="aux_mdio" value="&lt;b&gt;MDIO / SMA&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px&quot;&gt;Clause 22 &amp; 45&lt;/font&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#FFE0B2;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="420" y="530" width="115" height="50" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="aux_pcs" value="&lt;b&gt;PCS&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px&quot;&gt;8b10b / AN&lt;/font&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#FFE0B2;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="555" y="530" width="100" height="50" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="aux_tsu" value="&lt;b&gt;1588 TSU&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px&quot;&gt;System Time / PPS&lt;/font&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#FFE0B2;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="675" y="530" width="120" height="50" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="aux_eee" value="&lt;b&gt;EEE&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px&quot;&gt;IEEE 802.3az&lt;/font&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#FFE0B2;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="815" y="530" width="100" height="50" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="aux_pmt" value="&lt;b&gt;PMT&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px&quot;&gt;Magic / Wake-up&lt;/font&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#FFE0B2;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="935" y="530" width="105" height="50" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="aux_parser" value="&lt;b&gt;Rx Parser&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px&quot;&gt;L3/L4 Filter&lt;/font&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#FFE0B2;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="1060" y="530" width="105" height="50" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="aux_safety" value="&lt;b&gt;Safety&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px&quot;&gt;ECC / Parity&lt;/font&gt;" style="rounded=0;shadow=0;gradient=none;fillColor=#FFE0B2;strokeColor=#333333;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="1185" y="530" width="100" height="50" as="geometry"/>
+    </mxCell>
+
+    <!-- Clock info bar -->
+    <mxCell id="clk_bar" value="&lt;b&gt;Clocks:&lt;/b&gt;  csr_clk  |  app_clk  |  gmii_tx_clk (125MHz)  |  gmii_rx_clk (125MHz)  |  mdio_clk (≤2.5MHz)    &lt;b&gt;CDC:&lt;/b&gt; all GMII↔core via async FIFO w/ Gray-code" style="rounded=0;shadow=0;gradient=none;fillColor=#FFF5E6;strokeColor=#6C757D;strokeWidth=1;whiteSpace=wrap;html=1;fontColor=#000000;fontName=Arial;fontSize=8;" vertex="1" parent="1">
+      <mxGeometry x="420" y="595" width="1060" height="20" as="geometry"/>
+    </mxCell>
+
+    <!-- ====== DATA FLOW ANNOTATIONS ====== -->
+    <mxCell id="ann_tx" value="TX:  Memory → DMA Read → MTL TxQ → TxArb → MAC Tx → PHY I/F → PHY" style="text;fontColor=#2A9D8F;fontName=Arial;fontSize=9;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="430" y="400" width="600" height="16" as="geometry"/>
+    </mxCell>
+    <mxCell id="ann_rx" value="RX:  PHY → PHY I/F → MAC Rx → MTL RxQ → RxArb → DMA Write → Memory" style="text;fontColor=#2A9D8F;fontName=Arial;fontSize=9;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="430" y="418" width="600" height="16" as="geometry"/>
+    </mxCell>
+    <mxCell id="ann_ctl" value="CTL: CPU → CSR Slave (AHB/APB/AXI) → MAC / MTL / DMA register R/W" style="text;fontColor=#E63946;fontName=Arial;fontSize=9;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="430" y="436" width="600" height="16" as="geometry"/>
+    </mxCell>
+
+    <!-- ====== EDGES ====== -->
+
+    <!-- Bus → CSR (control) -->
+    <mxCell id="e1" value="" style="orthogonal=1;strokeColor=#E63946;strokeWidth=1;endArrow=block;arrowColor=#E63946;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="190" y="274" as="sourcePoint"/>
+        <mxPoint x="280" y="274" as="targetPoint"/>
+        <Array as="points">
+          <mxPoint x="280" y="274"/>
+          <mxPoint x="280" y="390"/>
+          <mxPoint x="500" y="390"/>
+          <mxPoint x="500" y="140"/>
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- Bus → DMA Tx (data) -->
+    <mxCell id="e2" value="" style="orthogonal=1;strokeColor=#2A9D8F;strokeWidth=2;endArrow=block;arrowColor=#2A9D8F;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="190" y="274" as="sourcePoint"/>
+        <mxPoint x="620" y="102" as="targetPoint"/>
+        <Array as="points">
+          <mxPoint x="350" y="274"/>
+          <mxPoint x="350" y="102"/>
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- Bus → DMA Rx (data) -->
+    <mxCell id="e3" value="" style="orthogonal=1;strokeColor=#2A9D8F;strokeWidth=2;endArrow=block;arrowColor=#2A9D8F;" edge="1" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <mxPoint x="190" y="274" as="sourcePoint"/>
+        <mxPoint x="620" y="217" as="targetPoint"/>
+        <Array as="points">
+          <mxPoint x="350" y="274"/>
+          <mxPoint x="350" y="217"/>
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- DMA Tx → MTL TxQ (forward data) -->
+    <mxCell id="e4" value="" style="orthogonal=1;strokeColor=#2A9D8F;strokeWidth=2;endArrow=block;arrowColor=#2A9D8F;" edge="1" parent="1" source="dma_tx" target="mtl_txq">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="l4" value="ATI" style="text;fontColor=#2A9D8F;fontName=Arial;fontSize=8;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="740" y="88" width="28" height="14" as="geometry"/>
+    </mxCell>
+
+    <!-- MTL RxQ → DMA Rx (backward data) — route BELOW both blocks -->
+    <mxCell id="e5" value="" style="orthogonal=1;strokeColor=#2A9D8F;strokeWidth=2;endArrow=block;arrowColor=#2A9D8F;" edge="1" parent="1" source="mtl_rxq" target="dma_rx">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="760" y="245"/>
+          <mxPoint x="760" y="270"/>
+          <mxPoint x="690" y="270"/>
+          <mxPoint x="690" y="245"/>
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="l5" value="ARI" style="text;fontColor=#2A9D8F;fontName=Arial;fontSize=8;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="748" y="258" width="24" height="14" as="geometry"/>
+    </mxCell>
+
+    <!-- MTL TxQ → MAC TX (forward) -->
+    <mxCell id="e6" value="" style="orthogonal=1;strokeColor=#2A9D8F;strokeWidth=2;endArrow=block;arrowColor=#2A9D8F;" edge="1" parent="1" source="mtl_txq" target="mac_tx">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="l6" value="MTI" style="text;fontColor=#2A9D8F;fontName=Arial;fontSize=8;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="920" y="88" width="28" height="14" as="geometry"/>
+    </mxCell>
+
+    <!-- MAC RX → MTL RxQ (backward) — route BELOW -->
+    <mxCell id="e7" value="" style="orthogonal=1;strokeColor=#2A9D8F;strokeWidth=2;endArrow=block;arrowColor=#2A9D8F;" edge="1" parent="1" source="mac_rx" target="mtl_rxq">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="940" y="245"/>
+          <mxPoint x="940" y="270"/>
+          <mxPoint x="870" y="270"/>
+          <mxPoint x="870" y="245"/>
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="l7" value="MRI" style="text;fontColor=#2A9D8F;fontName=Arial;fontSize=8;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="928" y="258" width="24" height="14" as="geometry"/>
+    </mxCell>
+
+    <!-- MAC TX → PHY MUX (forward) -->
+    <mxCell id="e8" value="" style="orthogonal=1;strokeColor=#F4A261;strokeWidth=2;endArrow=block;arrowColor=#F4A261;" edge="1" parent="1" source="mac_tx" target="phy_mux">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- PHY MUX → MAC RX (backward) — route BELOW -->
+    <mxCell id="e9" value="" style="orthogonal=1;strokeColor=#F4A261;strokeWidth=2;endArrow=block;arrowColor=#F4A261;" edge="1" parent="1" source="phy_mux" target="mac_rx">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="1165" y="175"/>
+          <mxPoint x="1165" y="260"/>
+          <mxPoint x="1090" y="260"/>
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- PHI MUX → External PHY -->
+    <mxCell id="e10" value="" style="orthogonal=1;strokeColor=#F4A261;strokeWidth=2;endArrow=block;arrowColor=#F4A261;" edge="1" parent="1" source="phy_mux" target="ext_phy">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- CSR → DMA (control) -->
+    <mxCell id="e11" value="" style="orthogonal=1;strokeColor=#E63946;strokeWidth=1;endArrow=block;arrowColor=#E63946;" edge="1" parent="1" source="csr" target="dma_tx">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- CSR → MTL (control) — route above -->
+    <mxCell id="e12" value="" style="orthogonal=1;strokeColor=#E63946;strokeWidth=1;endArrow=block;arrowColor=#E63946;" edge="1" parent="1" source="csr" target="mtl_txq">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="590" y="52"/>
+          <mxPoint x="845" y="52"/>
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- CSR → MAC (control) — route above -->
+    <mxCell id="e13" value="" style="orthogonal=1;strokeColor=#E63946;strokeWidth=1;endArrow=block;arrowColor=#E63946;" edge="1" parent="1" source="csr" target="mac_tx">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="590" y="40"/>
+          <mxPoint x="1025" y="40"/>
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- DMA Arbiter connections -->
+    <mxCell id="e14" value="" style="orthogonal=1;strokeColor=#6C757D;strokeWidth=1;endArrow=block;arrowColor=#6C757D;" edge="1" parent="1" source="dma_tx" target="dma_arb">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e15" value="" style="orthogonal=1;strokeColor=#6C757D;strokeWidth=1;endArrow=block;arrowColor=#6C757D;" edge="1" parent="1" source="dma_rx" target="dma_arb">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- MTL queue → scheduler connections -->
+    <mxCell id="e16" value="" style="orthogonal=1;strokeColor=#6C757D;strokeWidth=1;endArrow=block;arrowColor=#6C757D;" edge="1" parent="1" source="mtl_txq" target="mtl_txarb">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e17" value="" style="orthogonal=1;strokeColor=#6C757D;strokeWidth=1;endArrow=block;arrowColor=#6C757D;" edge="1" parent="1" source="mtl_rxq" target="mtl_rxarb">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- AUX: MDIO → PHY (route right side) -->
+    <mxCell id="e20" value="" style="orthogonal=1;strokeColor=#6C757D;strokeWidth=1;endArrow=block;arrowColor=#6C757D;" edge="1" parent="1" source="aux_mdio" target="ext_phy">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="380" y="555"/>
+          <mxPoint x="380" y="650"/>
+          <mxPoint x="1640" y="650"/>
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="l20" value="MDIO" style="text;fontColor=#6C757D;fontName=Arial;fontSize=8;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="400" y="640" width="36" height="14" as="geometry"/>
+    </mxCell>
+
+    <!-- AUX: TSU → MAC 1588 -->
+    <mxCell id="e21" value="" style="orthogonal=1;strokeColor=#6C757D;strokeWidth=1;endArrow=block;arrowColor=#6C757D;" edge="1" parent="1" source="aux_tsu" target="mac_1588">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="735" y="510"/>
+          <mxPoint x="735" y="395"/>
+          <mxPoint x="1060" y="395"/>
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="l21" value="Timestamp" style="text;fontColor=#6C757D;fontName=Arial;fontSize=8;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="745" y="498" width="56" height="14" as="geometry"/>
+    </mxCell>
+
+    <!-- AUX: EEE → MAC Rx -->
+    <mxCell id="e22" value="" style="orthogonal=1;strokeColor=#6C757D;strokeWidth=1;endArrow=block;arrowColor=#6C757D;" edge="1" parent="1" source="aux_eee" target="mac_rx">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="865" y="510"/>
+          <mxPoint x="865" y="395"/>
+          <mxPoint x="1000" y="395"/>
+          <mxPoint x="1000" y="260"/>
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- AUX: PMT → MAC Rx -->
+    <mxCell id="e23" value="" style="orthogonal=1;strokeColor=#6C757D;strokeWidth=1;endArrow=block;arrowColor=#6C757D;" edge="1" parent="1" source="aux_pmt" target="mac_rx">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="987" y="510"/>
+          <mxPoint x="987" y="395"/>
+          <mxPoint x="1025" y="395"/>
+          <mxPoint x="1025" y="260"/>
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- AUX: Rx Parser → MTL RxQ -->
+    <mxCell id="e24" value="" style="orthogonal=1;strokeColor=#6C757D;strokeWidth=1;endArrow=block;arrowColor=#6C757D;" edge="1" parent="1" source="aux_parser" target="mtl_rxq">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="1112" y="510"/>
+          <mxPoint x="1112" y="395"/>
+          <mxPoint x="845" y="395"/>
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- AUX: Safety → DMA -->
+    <mxCell id="e25" value="" style="orthogonal=1;strokeColor=#6C757D;strokeWidth=1;endArrow=block;arrowColor=#6C757D;" edge="1" parent="1" source="aux_safety" target="dma_tx">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="1235" y="510"/>
+          <mxPoint x="1235" y="395"/>
+          <mxPoint x="675" y="395"/>
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- Interrupts: DMA Intr → CPU -->
+    <mxCell id="e30" value="" style="orthogonal=1;strokeColor=#E63946;strokeWidth=1;endArrow=block;arrowColor=#E63946;" edge="1" parent="1" source="dma_intr" target="cpu">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="590" y="357"/>
+          <mxPoint x="590" y="390"/>
+          <mxPoint x="300" y="390"/>
+          <mxPoint x="300" y="110"/>
+          <mxPoint x="190" y="110"/>
+          <mxPoint x="190" y="82"/>
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="l30" value="Intr" style="text;fontColor=#E63946;fontName=Arial;fontSize=8;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="260" y="60" width="30" height="14" as="geometry"/>
+    </mxCell>
+
+    <!-- CSR ← CPU (register R/W) — route top -->
+    <mxCell id="e31" value="" style="orthogonal=1;strokeColor=#E63946;strokeWidth=1;endArrow=block;arrowColor=#E63946;" edge="1" parent="1" source="cpu" target="csr">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="340" y="82"/>
+          <mxPoint x="340" y="45"/>
+          <mxPoint x="500" y="45"/>
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+  </root>
+</mxGraphModel>

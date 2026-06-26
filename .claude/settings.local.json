@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Read(*)",
+      "Write(*)",
+      "Edit(*)",
+      "Glob(*)",
+      "Grep(*)",
+      "PowerShell(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "TodoWrite",
+      "Task(*)",
+      "Skill(*)",
+      "mcp__github__*"
+    ]
+  }
+}

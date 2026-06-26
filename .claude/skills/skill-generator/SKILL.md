@@ -1,0 +1,122 @@
+---
+name: skill-generator
+description: >-
+  Autonomous skill creator for Claude Code CLI. Use when the user asks to
+  "create a skill", "generate a skill", or "build a new slash command".
+  Uses multi-phase orchestrated workflow with Task tool subagents to research
+  domains, design architecture, generate content, validate quality, and
+  iteratively improve via eval infrastructure. Creates production-ready skills
+  following the Agent Skills open standard and Claude Code extensions.
+allowed-tools:
+  - Read
+  - Write
+  - Edit
+  - Bash
+  - Glob
+  - Grep
+  - WebFetch
+  - WebSearch
+  - Task
+  - AskUserQuestion
+  - TodoWrite
+metadata:
+  version: "3.1.0"
+  author: "DJ Patel — Founder & CEO, Platxa | https://platxa.com"
+  tags:
+    - skill-creation
+    - automation
+    - builder
+    - claude-code
+---
+
+# Platxa Skill Generator
+
+Create Claude Code skills autonomously using a multi-phase orchestrated workflow.
+
+## Overview
+
+This skill guides you through creating production-ready Claude Code skills by:
+
+1. **Discovering** domain knowledge through web research and existing skill analysis
+2. **Architecting** the skill structure based on type (Builder/Guide/Automation/Analyzer/Validator)
+3. **Generating** SKILL.md content, scripts, and reference documentation
+4. **Validating** against Anthropic's Agent Skills spec with quality scoring
+
+The workflow uses Task tool subagents for each phase, ensuring deep expertise at every step.
+
+## Workflow
+
+### Phase 1: Initialize
+
+Ask the user for:
+- Skill description (what should the skill do?)
+- Target users (who will use this skill?)
+
+### Phase 2: Discovery (Automatic)
+
+Use Task tool with `subagent_type="Explore"` to:
+1. Search web for domain best practices
+2. Fetch relevant documentation
+3. Analyze existing skills in `~/.claude/skills/` for patterns
+4. Identify procedural knowledge (HOW) vs domain expertise (WHAT)
+5. Determine what varies by project vs what's constant
+
+**Sufficiency Check**: Evaluate if research is complete. Only ask user for clarification if gaps exist.
+
+### Phase 3: Architecture
+
+Based on discovery, determine:
+- **Skill Type**: Builder, Guide, Automation, Analyzer, or Validator
+- **Structure**: Which directories needed (scripts/, references/, assets/)
+- **Token Budget**: SKILL.md < 500 lines, metadata ~100 tokens
+
+Generate architecture blueprint JSON.
+
+### Phase 4: Generation
+
+Create all skill files:
+1. **SKILL.md** with valid YAML frontmatter
+2. **scripts/** with executable helpers
+3. **references/** with domain documentation
+
+### Phase 5: Validation
+
+Run quality checks:
+- [ ] SKILL.md exists with valid frontmatter
+- [ ] Name is hyphen-case, <=64 characters
+- [ ] Description is <=1024 characters
+- [ ] Token budget within limits
+- [ ] Scripts are executable and secure
+- [ ] References provide real domain expertise
+- [ ] Quality score >=7.0/10
+
+**Evaluation Scaffold**: Generate 3 eval scenarios (happy-path, edge-case, error-handling) for testing.
+
+### Phase 6: Installation
+
+Install to user skill directory:
+- **User skill**: `~/.claude/skills/{skill-name}/`
+- **Project skill**: `.claude/skills/{skill-name}/`
+
+## Skill Types Reference
+
+| Type | Purpose | Key Sections |
+|------|---------|--------------|
+| Builder | Create new things | Workflow, Templates, Output Checklist |
+| Guide | Teach/explain | Steps, Examples, Best Practices |
+| Automation | Automate tasks | Triggers, Scripts, Verification |
+| Analyzer | Inspect/audit | Checklist, Metrics, Reports |
+| Validator | Verify quality | Rules, Thresholds, Pass/Fail Criteria |
+
+## Output Checklist
+
+- [ ] SKILL.md has valid YAML frontmatter
+- [ ] Name follows hyphen-case (e.g., `my-skill-name`)
+- [ ] Name is <=64 characters
+- [ ] Description is <=1024 characters
+- [ ] `allowed-tools` lists only tools the skill needs
+- [ ] Workflow section has clear steps
+- [ ] Examples show realistic usage
+- [ ] References contain actual domain expertise (not placeholders)
+- [ ] Scripts are executable and tested
+- [ ] Quality score >=7.0/10

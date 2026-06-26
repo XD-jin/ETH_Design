@@ -1,0 +1,17 @@
+# Sensitive — contains GitHub token, do not commit
+.claude/mcp.json
+
+# Large binaries
+.claude/bin/*.exe
+.claude/bin/*.zip
+
+# Temporary extracted text files
+doc/*.txt
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+*.swp
+*.swo
