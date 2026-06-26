@@ -47,7 +47,19 @@ module async_fifo #(
     output wire                   almost_empty
 );
 
-    localparam P_ADDR_WIDTH = $clog2(P_DEPTH);
+    //--------------------------------------------------------------------------
+    // Verilog-2001 compatible $clog2 function
+    //--------------------------------------------------------------------------
+    function integer clog2;
+        input integer depth;
+        integer i;
+        begin
+            i = depth - 1;
+            for (clog2 = 0; i > 0; clog2 = clog2 + 1) i = i >> 1;
+        end
+    endfunction
+
+    localparam P_ADDR_WIDTH = clog2(P_DEPTH);
 
     //--------------------------------------------------------------------------
     // Internal Signals

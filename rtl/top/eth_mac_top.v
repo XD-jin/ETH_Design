@@ -80,7 +80,9 @@ module eth_mac_top #(
     //--------------------------------------------------------------------------
     wire gmii_tx_clk;
     wire gmii_rx_clk;
-    assign gmii_tx_clk = hclk;               // Simplified: use hclk as TX clock source
+    // NOTE: V1.0 simulation uses hclk as TX clock source for convenience.
+    // Production: gmii_tx_clk must come from dedicated 125MHz PLL, independent from hclk.
+    assign gmii_tx_clk = hclk;
     assign gmii_rx_clk = rgmii_rxc;           // RX clock from PHY
 
     //--------------------------------------------------------------------------
@@ -359,7 +361,7 @@ module eth_mac_top #(
         .cfg_hash_mode     (1'b0),
         .cfg_pass_ctrl     (1'b0),
         .cfg_hash_mcast    (1'b0),
-        .cfg_mac_addr      ('{48'd0, 48'd0, 48'd0, 48'd0}),
+        .cfg_mac_addr      (192'd0),
         .cfg_hash_table    (64'd0),
         .rx_da_valid       (rx_da_valid),
         .rx_da             (rx_da),

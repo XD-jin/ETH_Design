@@ -47,7 +47,7 @@ module addr_filter #(
     input  wire        cfg_hash_mode,         // Hash/Perfect mode select (HPF)
     input  wire        cfg_pass_ctrl,         // Pass control frames (PCF)
     input  wire        cfg_hash_mcast,        // Hash multicast (HM)
-    input  wire [47:0] cfg_mac_addr [0:3],    // Perfect-match MAC address table
+    input  wire [191:0] cfg_mac_addr,          // Perfect-match MAC address table (flat: {addr3,addr2,addr1,addr0})
     input  wire [63:0] cfg_hash_table,        // Hash filter table
 
     // Received frame DA (from MAC RX parser)
@@ -67,6 +67,12 @@ module addr_filter #(
     //--------------------------------------------------------------------------
     // Internal Signals
     //--------------------------------------------------------------------------
+    wire [47:0] cfg_mac_addr_int [0:3];       // Unpacked per-entry MAC addresses
+    assign cfg_mac_addr_int[0] = cfg_mac_addr[ 47:  0];
+    assign cfg_mac_addr_int[1] = cfg_mac_addr[ 95: 48];
+    assign cfg_mac_addr_int[2] = cfg_mac_addr[143: 96];
+    assign cfg_mac_addr_int[3] = cfg_mac_addr[191:144];
+
     wire [3:0] perfect_match;               // Per-entry perfect match results
     wire [5:0] da_hash;                     // 6-bit hash from CRC-32 of DA
     wire       hash_table_hit;              // Hash table lookup result
@@ -82,7 +88,7 @@ module addr_filter #(
     generate
         genvar i;
         for (i = 0; i < P_MAC_ADDR_ENTRIES; i = i + 1) begin : gen_perfect_match
-            assign perfect_match[i] = (rx_da == cfg_mac_addr[i]) && cfg_mac_addr[i] != 48'h0000_0000_0000;
+            assign perfect_match[i] = (rx_da == cfg_mac_addr_int[i]) && cfg_mac_addr_int[i] != 48'h0000_0000_0000;
         end
     endgenerate
 

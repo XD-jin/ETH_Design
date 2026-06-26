@@ -63,7 +63,7 @@ module eth_clk_gate #(
             // Enable Latch: transparent when clk_in is LOW
             // Captures en value to prevent glitches on clk_out.
             //------------------------------------------------------------------
-            always @(clk_in or rst_n or en) begin
+            always @(*) begin
                 if (rst_n == 1'b0)
                     en_latch = 1'b0;
                 else if (clk_in == 1'b0)
