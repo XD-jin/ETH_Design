@@ -84,6 +84,7 @@ module eth_mac_top #(
     // It is fully asynchronous to hclk and gmii_rx_clk.
     //--------------------------------------------------------------------------
     wire gmii_rx_clk;
+    assign hm_size_o = 3'd2;
     assign gmii_rx_clk = rgmii_rxc;           // RX clock from PHY
 
     //--------------------------------------------------------------------------
