@@ -44,7 +44,6 @@ module ahb_slave_if #(
     reg        write_reg;
     reg        size_ok;               // 1 = HSIZE is valid (32-bit only)
     reg        burst_ok;              // 1 = HBURST is SINGLE or INCR
-    reg        hresp_reg;
 
     wire transfer_active;
     assign transfer_active = hsel && htrans[1];    // NONSEQ or SEQ
@@ -92,29 +91,13 @@ module ahb_slave_if #(
             end
 
             //------------------------------------------------------------------
-            // Phase 2: Data response with HSIZE/HBURST error check
-            //------------------------------------------------------------------
-            always @(posedge hclk or negedge hresetn) begin
-                if (hresetn == 1'b0) begin
-                    hresp_reg  <= 1'b0;
-                end else begin
-                    if (access_valid) begin
-                        // Two-cycle response (OKAY or ERROR)
-                        // hresp: 0=OKAY, 1=ERROR for unsupported size/burst
-                        hresp_reg <= ~(size_ok && burst_ok);
-                    end else begin
-                        hresp_reg <= 1'b0;
-                    end
-                end
-            end
-
-            //------------------------------------------------------------------
-            // Outputs
+            // Outputs — all combinational in Phase 2
             //------------------------------------------------------------------
             // hrdata: combinational from reg_rd_data (zero when in error)
             assign hrdata     = (access_valid && ~write_reg && size_ok && burst_ok) ? reg_rd_data : 32'd0;
             assign hready     = 1'b1;     // Zero wait state
-            assign hresp      = hresp_reg;
+            // hresp: combinational from Phase1-captured size_ok/burst_ok
+            assign hresp      = access_valid ? ~(size_ok && burst_ok) : 1'b0;
 
             // Write: pass hwdata through in Phase 2 (data phase)
             assign reg_wr_en   = access_valid && write_reg && size_ok && burst_ok;

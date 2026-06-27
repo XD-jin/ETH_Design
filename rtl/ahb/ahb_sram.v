@@ -30,9 +30,9 @@ module ahb_sram #(
     input  wire [31:0] hwdata,
     input  wire [ 1:0] htrans,
     input  wire [ 2:0] hsize,
-    output reg  [31:0] hrdata,
-    output reg         hready,
-    output reg         hresp
+    output wire [31:0] hrdata,
+    output wire        hready,
+    output wire        hresp
 );
 
     //--------------------------------------------------------------------------
@@ -85,30 +85,19 @@ module ahb_sram #(
     end
 
     //--------------------------------------------------------------------------
-    // Phase 2: Data response
+    // Phase 2: Data response — combinational for 2-cycle access
     //--------------------------------------------------------------------------
-    always @(posedge hclk or negedge hresetn) begin
-        if (hresetn == 1'b0) begin
-            hrdata <= 32'd0;
-            hready <= 1'b1;
-            hresp  <= 1'b0;
-        end else begin
-            if (access_valid) begin
-                hready <= 1'b1;
-                if (write_reg && size_ok) begin
-                    mem[addr_reg] <= hwdata;
-                    hresp <= 1'b0;
-                end else if (~write_reg && size_ok) begin
-                    hrdata <= mem[addr_reg];
-                    hresp <= 1'b0;
-                end else begin
-                    hresp <= 1'b1;   // ERROR for byte/halfword
-                end
-            end else begin
-                hready <= 1'b1;
-                hresp  <= 1'b0;
-            end
-        end
+    wire mem_read_en;
+    assign mem_read_en = access_valid && ~write_reg && size_ok;
+
+    assign hrdata = mem_read_en ? mem[addr_reg] : 32'd0;
+    assign hready = 1'b1;
+    assign hresp  = access_valid ? ~(size_ok) : 1'b0;
+
+    // Write: sequential (registered address, data from hwdata)
+    always @(posedge hclk) begin
+        if (access_valid && write_reg && size_ok)
+            mem[addr_reg] <= hwdata;
     end
 
 endmodule
