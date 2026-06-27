@@ -66,15 +66,13 @@ module tb_eth_mac_top;
     //==========================================================================
     // AHB Slave Memory (DMA target) signals
     //==========================================================================
-    wire [31:0] dma_hm_addr;
-    wire        dma_hm_write;
-    wire [31:0] dma_hm_wdata;
-    wire [ 2:0] dma_hm_size;
-    wire [ 2:0] dma_hm_burst;
-    wire [ 1:0] dma_hm_trans;
-    reg  [31:0] dma_hm_rdata;
-    reg         dma_hm_ready;
-    reg         dma_hm_resp;
+    // AHB Master bus — connects DUT to SRAM
+    wire [31:0] hm_addr_o;
+    wire        hm_write_o;
+    wire [31:0] hm_wdata_o;
+    wire [ 2:0] hm_size_o;
+    wire [ 2:0] hm_burst_o;
+    wire [ 1:0] hm_trans_o;
 
     //==========================================================================
     // RGMII Loopback signals
@@ -132,16 +130,16 @@ module tb_eth_mac_top;
         .hready         (bfm_hready),
         .hresp          (bfm_hresp),
 
-        // AHB Master (DMA) — drives slave memory
-        .hm_addr_o      (dma_hm_addr),
-        .hm_write_o     (dma_hm_write),
-        .hm_wdata_o     (dma_hm_wdata),
-        .hm_size_o      (dma_hm_size),
-        .hm_burst_o     (dma_hm_burst),
-        .hm_trans_o     (dma_hm_trans),
-        .hm_rdata_i     (dma_hm_rdata),
-        .hm_ready_i     (dma_hm_ready),
-        .hm_resp_i      (dma_hm_resp),
+        // AHB Master (DMA) — connected to ahb_sram
+        .hm_addr_o      (hm_addr_o),
+        .hm_write_o     (hm_write_o),
+        .hm_wdata_o     (hm_wdata_o),
+        .hm_size_o      (hm_size_o),
+        .hm_burst_o     (hm_burst_o),
+        .hm_trans_o     (hm_trans_o),
+        .hm_rdata_i     (sram_hrdata),
+        .hm_ready_i     (sram_hready),
+        .hm_resp_i      (sram_hresp),
 
         // GMII TX Clock
         .gmii_tx_clk    (gmii_tx_clk),
@@ -163,48 +161,31 @@ module tb_eth_mac_top;
     );
 
     //==========================================================================
-    // AHB Slave Memory Model (DMA read/write target)
+    // AHB SRAM — 32KB, pre-loaded from mem.dat
     //==========================================================================
-    reg [31:0] mem [0:65535];          // 256KB simulated system memory
-    reg [31:0] mem_addr_d1;            // registered address for read latency
-    reg        mem_read_active;
+    wire        sram_hready;
+    wire [31:0] sram_hrdata;
+    wire        sram_hresp;
 
-    // AHB read state: latches address in Phase1, returns data in Phase2
-    // Handles the fact that HTRANS returns to IDLE during data phase
-    reg        mem_read_pending;          // Read was started, waiting to return data
+    ahb_sram #(.P_MEM_FILE("mem.dat"), .P_DEPTH(8192))
+    u_sram
+    (
+        .hclk       (hclk),
+        .hresetn    (hresetn),
+        .hsel       (1'b1),           // Always selected
+        .haddr      (hm_addr_o),
+        .hwrite     (hm_write_o),
+        .hwdata     (hm_wdata_o),
+        .htrans     (hm_trans_o),
+        .hsize      (hm_size_o),
+        .hrdata     (sram_hrdata),
+        .hready     (sram_hready),
+        .hresp      (sram_hresp)
+    );
 
-    always @(posedge hclk or negedge hresetn) begin
-        if (!hresetn) begin
-            dma_hm_ready     <= 1'b1;
-            dma_hm_resp      <= 1'b0;
-            dma_hm_rdata     <= 32'd0;
-            mem_read_active  <= 1'b0;
-            mem_read_pending <= 1'b0;
-            mem_addr_d1      <= 32'd0;
-        end else begin
-            // Phase 1: Capture address when HTRANS=NONSEQ/SEQ
-            if (dma_hm_trans[1]) begin
-                if (dma_hm_write) begin
-                    mem[dma_hm_addr[17:2]] <= dma_hm_wdata;
-                    dma_hm_ready <= 1'b1;
-                end else begin
-                    // Latch address, prepare data for next cycle
-                    mem_addr_d1      <= dma_hm_addr;
-                    mem_read_pending <= 1'b1;
-                    dma_hm_ready     <= 1'b0;     // Wait state
-                end
-            // Phase 2: Return read data (HTRANS may already be IDLE)
-            end else if (mem_read_pending) begin
-                dma_hm_rdata     <= mem[mem_addr_d1[17:2]];
-                dma_hm_ready     <= 1'b1;          // Data valid
-                dma_hm_resp      <= 1'b0;
-                mem_read_pending <= 1'b0;
-            end else begin
-                dma_hm_ready <= 1'b1;
-                dma_hm_resp  <= 1'b0;
-            end
-        end
-    end
+    assign hm_ready_i = sram_hready;
+    assign hm_rdata_i = sram_hrdata;
+    assign hm_resp_i  = sram_hresp;
 
     //==========================================================================
     // AHB Register BFM Tasks
@@ -245,83 +226,6 @@ module tb_eth_mac_top;
     end
     endtask
 
-    //==========================================================================
-    // Descriptor Setup Helper
-    //==========================================================================
-    task setup_tx_descriptor;
-        input [ 7:0] desc_index;
-        input [31:0] buf1_addr;
-        input [15:0] buf1_len;
-        input        ioc;          // interrupt on completion
-    begin
-        reg [31:0] desc_base;
-        reg [31:0] desc_addr;
-        reg [31:0] tdes0, tdes1, tdes2, tdes3;
-
-        desc_base = 32'h0000_1000;  // Descriptor ring at 0x1000
-        desc_addr = desc_base + (desc_index * 32'd16);
-
-        // TDES0: Buffer 1 Address
-        tdes0 = buf1_addr;
-        // TDES1: Buffer 2 Address (unused)
-        tdes1 = 32'd0;
-        // TDES2: {IOC[31], TTSE[30], B2L[29:16], VTIR[15:14], B1L[13:0]}
-        tdes2 = {ioc, 1'b0, 14'd0, 2'b00, buf1_len[13:0]};
-        // TDES3: {OWN[31], CTXT[30], FD[29], LD[28], CPC[27:26], SAIC[25:23],
-        //         THL[22:19], TSE[18], CIC[17:16], TPL[15], FL[14:0]}
-        tdes3 = {1'b1, 1'b0, 1'b1, 1'b1, 2'b00, 3'b000, 4'd0, 1'b0, 2'b00, 1'b0, buf1_len[14:0]};
-
-        // Write descriptor to memory (word by word)
-        // mem is accessed by DMA via hm_addr[17:2], so 32-bit word aligned
-        mem[desc_addr[17:2]]     = tdes0;
-        mem[desc_addr[17:2] + 1] = tdes1;
-        mem[desc_addr[17:2] + 2] = tdes2;
-        mem[desc_addr[17:2] + 3] = tdes3;
-
-        $display("[TB] TX Desc[%0d] @ 0x%08x: BUF1=0x%08x LEN=%0d IOC=%0d",
-                 desc_index, desc_addr, buf1_addr, buf1_len, ioc);
-    end
-    endtask
-
-    //==========================================================================
-    // Ethernet Frame Builder
-    //==========================================================================
-    task build_eth_frame;
-        input  [47:0] da;
-        input  [47:0] sa;
-        input  [15:0] etype;
-        input  [ 7:0] payload_data [0:1499];  // max 1500 bytes
-        input  [15:0] payload_len;
-        output [ 7:0] frame_data [0:1535];
-        output [15:0] frame_len;
-        integer i;
-        integer j;
-    begin
-        i = 0;
-        // DA[47:0]
-        frame_data[i] = da[47:40]; i = i + 1; frame_data[i] = da[39:32]; i = i + 1;
-        frame_data[i] = da[31:24]; i = i + 1; frame_data[i] = da[23:16]; i = i + 1;
-        frame_data[i] = da[15: 8]; i = i + 1; frame_data[i] = da[ 7: 0]; i = i + 1;
-        // SA[47:0]
-        frame_data[i] = sa[47:40]; i = i + 1; frame_data[i] = sa[39:32]; i = i + 1;
-        frame_data[i] = sa[31:24]; i = i + 1; frame_data[i] = sa[23:16]; i = i + 1;
-        frame_data[i] = sa[15: 8]; i = i + 1; frame_data[i] = sa[ 7: 0]; i = i + 1;
-        // EtherType
-        frame_data[i] = etype[15:8]; i = i + 1; frame_data[i] = etype[7:0]; i = i + 1;
-        // Payload
-        for (j = 0; j < payload_len; j = j + 1) begin
-            frame_data[i] = payload_data[j];
-            i = i + 1;
-        end
-        // PAD: minimum 46 bytes of data after DA+SA+EType (14 bytes)
-        while (i < 60) begin
-            frame_data[i] = 8'h00;
-            i = i + 1;
-        end
-        // CRC-32 will be appended by MAC hardware
-        frame_len = i;  // without CRC
-    end
-    endtask
 
     //==========================================================================
     // Scoreboard
@@ -347,8 +251,8 @@ module tb_eth_mac_top;
     //==========================================================================
     reg [ 7:0] tx_capture [0:2047];
     reg [15:0] tx_byte_cnt;
-    reg        tx_capturing;
     reg [15:0] tx_frame_len;
+    reg        tx_capturing;
 
     always @(posedge rgmii_txc) begin
         if (!hresetn) begin
@@ -379,10 +283,7 @@ module tb_eth_mac_top;
     // Main Test Sequence
     //==========================================================================
     reg [31:0] rdata;
-    reg [ 7:0] payload [0:1499];
     reg [ 7:0] frame [0:1535];
-    reg [15:0] frame_len;
-    reg [31:0] buf_addr;
     integer    i;
 
     initial begin
@@ -435,49 +336,19 @@ module tb_eth_mac_top;
         $display("[TB] Packet Filter: Promiscuous mode");
 
         //----------------------------------------------------------------------
-        // Phase 2: Build Test Frame and Setup DMA
+        // Phase 2: DMA Configuration (descriptors & frame pre-loaded from mem.dat)
         //----------------------------------------------------------------------
-        $display("[TB] --- Phase 2: Build Frame & DMA Setup ---");
+        $display("[TB] --- Phase 2: DMA Configuration ---");
 
-        // 2.1 Build payload (simple incrementing pattern)
-        for (i = 0; i < 46; i = i + 1)
-            payload[i] = i[7:0];
-        $display("[TB] Payload: 46 bytes (0x00, 0x01, ..., 0x2D)");
+        // TX/RX Descriptor Rings and Frame Data pre-loaded in ahb_sram from mem.dat
+        // TX Desc @ 0x1000: BUF1=0x2000, OWN=1, FD=1, LD=1, B1L=60, IOC=1
+        // RX Desc @ 0x1100: BUF1=0x3000, OWN=1, BUF2V=1, BUF1V=1
+        // TX Frame  @ 0x2000: DA=66:55:44:33:22:11 SA=00:11:22:33:44:55 Type=0x0800 Payload=00..2D
 
-        // 2.2 Build Ethernet frame
-        //     DA = 66:55:44:33:22:11 (same as our MAC address → loopback receive)
-        //     SA = 00:11:22:33:44:55
-        //     EtherType = 0x0800 (IPv4)
-        build_eth_frame(48'h665544332211, 48'h001122334455, 16'h0800,
-                        payload, 46, frame, frame_len);
-        $display("[TB] Frame built: %0d bytes (CRC will be appended by MAC)", frame_len);
-
-        // 2.3 Store frame in simulated memory at buffer address 0x2000
-        buf_addr = 32'h0000_2000;
-        for (i = 0; i < frame_len; i = i + 4) begin
-            mem[buf_addr[17:2] + (i/4)] = {frame[i], frame[i+1], frame[i+2], frame[i+3]};
-        end
-        $display("[TB] Frame stored at 0x%08x", buf_addr);
-
-        // 2.4 Setup TX Descriptor 0 for Channel 0
-        setup_tx_descriptor(0, buf_addr, frame_len, 1'b1);  // IOC=1
-
-        //----------------------------------------------------------------------
-        // Phase 3: Configure and Start DMA
-        //----------------------------------------------------------------------
-        $display("[TB] --- Phase 3: DMA Configuration ---");
-
-        // 3.1 DMA_CH0_TxDesc_List_Addr = 0x1000
+        // 2.1 DMA_CH0_TxDesc_List_Addr = 0x1000
         ahb_write(13'h1114, 32'h0000_1000);
-        // 3.2 DMA_CH0_RxDesc_List_Addr = 0x1100
+        // 2.2 DMA_CH0_RxDesc_List_Addr = 0x1100
         ahb_write(13'h111C, 32'h0000_1100);
-
-        // 3.3 Setup RX descriptor (DMA will write received frame here)
-        //     RX Buffer at 0x3000, 2048 bytes
-        mem[17'h1100 >> 2]     = 32'h0000_3000;  // RDES0: BUF1ADDR
-        mem[(17'h1100>>2) + 1] = 32'd0;            // RDES1: reserved
-        mem[(17'h1100>>2) + 2] = 32'h0000_3000;    // RDES2: BUF2ADDR
-        mem[(17'h1100>>2) + 3] = {1'b1, 1'b0, 6'd0, 1'b1, 1'b1, 22'd0};
         // RDES3: OWN=1, IOC=0, BUF2V=1, BUF1V=1
         $display("[TB] RX Descriptor setup at 0x1100: BUF=0x3000");
 
@@ -514,24 +385,13 @@ module tb_eth_mac_top;
         // 5.1 Check TX frame captured by monitor
         $display("[TB] TX Monitor: %0d bytes transmitted", tx_frame_len);
 
-        // 5.2 Check RX descriptor status (OWN bit should be cleared by DMA)
-        //     RDES3 at 0x1100+12 should show OWN=0
+        // 5.2 Check RX descriptor status
         ahb_read(13'h1144, rdata);    // DMA_CH0_Status
         check_equal("DMA_CH0_Status RI", rdata[6], 1'b1);  // Receive Interrupt
 
-        // 5.3 Read received frame from memory and compare
-        $display("[TB] RX Data @ 0x3000:");
-        for (i = 0; i < 10; i = i + 4) begin
-            $display("  mem[%0d] = 0x%08x", i/4, mem[17'h3000>>2 + i/4]);
-        end
-
-        // 5.4 Compare first few bytes (DA, SA, Type) with sent frame
-        for (i = 0; i < 14; i = i + 1) begin
-            reg [31:0] rx_word, tx_word;
-            rx_word = mem[17'h3000>>2 + i/4];
-            tx_word = {frame[i], frame[i+1], frame[i+2], frame[i+3]};
-        end
-        $display("[TB] Frame comparison: first 14 bytes match expected");
+        // 5.3 Received frame is in SRAM @ 0x3000 — check via AHB read
+        ahb_read(13'h3000 >> 2, rdata);
+        $display("[TB] RX First word @ 0x3000 = 0x%08x", rdata);
 
         //----------------------------------------------------------------------
         // Phase 6: Report

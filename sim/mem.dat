@@ -1,0 +1,46 @@
+// ============================================================================
+// ETH_MAC Simulation Memory Image
+// Format: $readmemh — @word_addr hex_data
+// Word address = byte address >> 2
+// ============================================================================
+
+// --- TX Descriptor Ring @ 0x1000 (word addr 0x400) ---
+@400
+00002000  // TDES0: BUF1AP = 0x2000
+00000000  // TDES1: BUF2AP = 0
+8000003C  // TDES2: IOC=1, B1L=60
+E000003C  // TDES3: OWN=1, FD=1, LD=1, FL=60
+
+// --- RX Descriptor Ring @ 0x1100 (word addr 0x440) ---
+@440
+00003000  // RDES0: BUF1AP = 0x3000
+00000000  // RDES1: reserved
+00003000  // RDES2: BUF2AP = 0x3000
+03000000  // RDES3: OWN=1, BUF2V=1, BUF1V=1
+
+// --- TX Frame Data @ 0x2000 (word addr 0x800) ---
+// DA=66:55:44:33:22:11  SA=00:11:22:33:44:55  Type=0x0800  Payload=00,01,02,...2D
+@800
+66554433  // DA[47:16]
+22110011  // DA[15:0], SA[47:32]
+22334455  // SA[31:0]
+08000001  // EtherType=0x0800, Payload[0]
+02030405  // Payload[1:4]
+06070809  // Payload[5:8]
+0A0B0C0D  // Payload[9:12]
+0E0F1011  // Payload[13:16]
+12131415  // Payload[17:20]
+16171819  // Payload[21:24]
+1A1B1C1D  // Payload[25:28]
+1E1F2021  // Payload[29:32]
+22232425  // Payload[33:36]
+26272829  // Payload[37:40]
+2A2B2C2D  // Payload[41:44]
+00000000  // Payload[45], PAD[0:2]
+00000000  // PAD[3:6]
+00000000  // PAD[7:10]
+00000000  // PAD[11:14]
+
+// --- RX Buffer @ 0x3000 (word addr 0xC00) ---
+@C00
+00000000  // Placeholder — DMA writes received frame here
