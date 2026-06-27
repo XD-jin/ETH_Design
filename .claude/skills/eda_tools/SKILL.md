@@ -1,114 +1,93 @@
 ---
 name: eda-tools
-description: EDA 工具快速调用参考 — VCS 编译/仿真、Verdi 波形、Vivado 综合、dc_shell、Lint/nLint/SpyGlass
+description: EDA 工具调用 — 通过 Makefile 驱动 VCS 编译仿真、Verdi 波形、Lint/Vivado/DC
 triggers:
-  - VCS
-  - Verdi
-  - EDA
-  - 仿真命令
-  - 综合命令
+  - 编译
+  - 仿真
+  - verdi
+  - 跑仿真
+  - make
+  - vcs
   - lint
-  - nLint
-  - SpyGlass
-  - Vivado
-  - dc_shell
+  - 综合
 ---
 
-# EDA Tools Quick Reference
+# EDA Tools — Makefile-Driven
 
-## VCS
+所有 EDA 操作统一通过 `sim/Makefile` 执行。
 
-```bash
-# Compile only
-vcs -full64 -sverilog -debug_access+all -timescale=1ns/10ps \
-    -f rtl.f -top <tb_top> -o simv
-
-# Compile + run
-vcs ... -o simv && ./simv -l sim.log
-
-# Run with waveform (via UCLI)
-./simv -ucli -do run.tcl
-```
-
-| Flag | Purpose |
-|------|---------|
-| `-full64` | 64-bit |
-| `-sverilog` | SystemVerilog |
-| `-debug_access+all` | Full debug (FSDB dump, Verdi) |
-| `-lca` | License for Verdi/KDB |
-| `-kdb` | Knowledge Database for Verdi |
-| `+vcs+lic+wait` | Wait for license if busy |
-| `-f <file>` | File list |
-| `-top <mod>` | Top module |
-| `-o <name>` | Output executable |
-| `+define+<MACRO>` | Define macro |
-
-### run.tcl (UCLI)
-
-```tcl
-fsdbDumpfile tb_top.fsdb
-fsdbDumpvars 0 tb_top
-run
-quit
-```
-
-## Verdi
+## Makefile 入口
 
 ```bash
-# Open waveform
-verdi -f rtl.f -ssf tb_top.fsdb -nologo &
-
-# Open RTL source only (no waveform)
-verdi -f rtl.f -top <dut_top> -nologo &
-
-# Reload waveform in running Verdi
-verdi -f rtl.f -ssf new.fsdb -nologo &
+cd sim
 ```
 
-| Flag | Purpose |
-|------|---------|
-| `-f <file>` | File list |
-| `-ssf <fsdb>` | Fast Signal Database (waveform) |
-| `-top <mod>` | Top module for hierarchy |
-| `-nologo` | Skip splash screen |
+| 命令 | 作用 |
+|------|------|
+| `make` | 生成 rtl.f + VCS 编译 |
+| `make sim` | VCS 编译 + 运行仿真 → 生成 .fsdb 波形 |
+| `make verdi` | 打开 Verdi 查看波形 |
+| `make verdi_src` | 打开 Verdi 只看 RTL 源码 |
+| `make clean` | 清除所有生成文件 |
+| `make help` | 帮助 |
 
-## Lint
+## Makefile 变量
+
+```makefile
+PROJ_ROOT = /home/chipmentor/project/GMAC  # 项目根目录
+RTL_DIR   = $(PROJ_ROOT)/rtl                # RTL 源码
+SIM_DIR   = $(PROJ_ROOT)/sim                # 仿真目录
+TOP = tb_eth_mac_top                        # 仿真顶层
+```
+
+覆盖默认变量：
+```bash
+make sim TOP=my_new_tb                     # 指定其他 testbench
+```
+
+## 编译选项
+
+Makefile 中 VCS 编译行：
+```makefile
+vcs -full64 -sverilog -debug_access+all \
+    -timescale=1ns/10ps -lca -kdb +vcs+lic+wait \
+    -f rtl.f -top $(TOP) -o simv
+```
+
+如需添加 `+define+MY_FLAG`：
+```bash
+make VCS_OPTS="+define+MY_FLAG" compile
+```
+
+## 波形
+
+仿真生成 `tb_eth_mac_top.fsdb`，用 `make verdi` 打开。
+
+Verdi 中快捷键：
+- `f` — 添加信号到波形
+- `Shift+w` — 保存波形配置 (.rc)
+- `Ctrl+w` — 加载波形配置
+- `z` / `Shift+z` — 放大/缩小
+
+## 其他 EDA
 
 ### nLint
-
 ```bash
-nlint -f rtl.f -top <top> -out nlint_report
+nlint -f sim/rtl.f -top eth_mac_top -out nlint_report
 ```
 
-### SpyGlass
-
-```bash
-spyglass -project sg.prj -goal lint/lint_rtl -batch
-```
-
-## Vivado
-
-```bash
-# Read RTL
-read_verilog -sv [glob rtl/**/*.v]
-# Synthesis
-synth_design -top <top> -part <xilinx_part>
-# Report
-report_utilization
-report_timing_summary
-```
-
-## Design Compiler
-
+### Vivado
 ```tcl
-# Read RTL
+read_verilog -sv [glob rtl/**/*.v]
+synth_design -top eth_mac_top -part <xilinx_part>
+report_utilization; report_timing_summary
+```
+
+### Design Compiler
+```tcl
 analyze -format sverilog [glob rtl/**/*.v]
-elaborate <top>
-# Constraints
+elaborate eth_mac_top
 source constraints.sdc
-# Compile
 compile_ultra
-# Report
 report_area > area.rpt
-report_timing > timing.rpt
 ```
