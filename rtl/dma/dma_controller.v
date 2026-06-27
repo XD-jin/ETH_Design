@@ -228,10 +228,9 @@ module dma_controller #(
             u_arbiter (
                 .clk          (clk),
                 .rst_n        (rst_n),
+                .ahb_idle     (ahb_grant),               // AHB master in ST_IDLE
                 .tx_req       ({tx1_ahb_req, tx0_ahb_req}),
                 .rx_req       ({rx1_ahb_req, rx0_ahb_req}),
-                .tx_priority  (cfg_dma_mode[1]),
-                .tx_pri_ratio (cfg_dma_mode[14:12]),
                 .tx_grant     (tx_arb_grant),
                 .rx_grant     (rx_arb_grant),
                 .bus_to_tx    (bus_to_tx)
