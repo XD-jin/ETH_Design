@@ -55,7 +55,8 @@ module ahb_slave_if #(
     reg        access_valid;          // 1 = a valid access was captured in Phase 1
     reg [12:0] addr_reg;              // Registered address (Phase 1 capture)
     reg        write_reg;             // Registered write flag
-    reg [31:0] wdata_reg;             // Registered write data
+    // Note: wdata is NOT captured in Phase 1 — per AHB spec, HWDATA is only
+    // valid in Phase 2 (data phase). It passes through combinationally below.
 
     // Read data is combinational (see assign below)
     reg        hready_reg;
@@ -88,16 +89,13 @@ module ahb_slave_if #(
                     access_valid <= 1'b0;
                     addr_reg     <= 13'd0;
                     write_reg    <= 1'b0;
-                    wdata_reg    <= 32'd0;
                 end else begin
                     if (transfer_active) begin
-                        // Capture address phase info
+                        // Phase 1: Capture address and control (hwdata NOT valid yet)
                         access_valid <= 1'b1;
                         addr_reg     <= haddr;
                         write_reg    <= hwrite;
-                        wdata_reg    <= hwdata;       // hwdata is valid in address phase for writes
                     end else begin
-                        // Clear valid flag when no transfer
                         access_valid <= 1'b0;
                     end
                 end
@@ -137,10 +135,12 @@ module ahb_slave_if #(
             assign hready     = hready_reg;
             assign hresp      = hresp_reg;
 
-            // Write strobe: pulsed in the data phase when access_valid=1 and it's a write
+            // Write strobe: pulsed in Phase 2 (data phase).
+            // HWDATA is valid NOW (Phase 2), pass through combinationally.
+            // reg_addr is the Phase 1-captured address, stable in Phase 2.
             assign reg_wr_en  = access_valid && write_reg;
-            assign reg_addr   = addr_reg;              // Stable registered address
-            assign reg_wr_data = wdata_reg;             // Registered write data
+            assign reg_addr   = addr_reg;
+            assign reg_wr_data = hwdata;               // hwdata valid only in Phase 2
 
         end
     endgenerate
