@@ -398,86 +398,110 @@ agdc_clk_gate u_ckg_pipe0
 
 流片时在综合脚本中定义对应宏即可切换，功能 RTL 无需修改。
 
-#### SHELL_MODE 空壳模式（M2 强制）
+#### SHELL_MODE 空壳模式
 
-每个模块顶层必须包含 `P_SHELL_MODE` 参数，用于系统级仿真时将不需要的模块变为空壳，避免其输出影响总线行为。
+只有**顶层模块**需要 `P_SHELL_MODE` 参数。子模块通过顶层传参获得 shell 状态，不需要各自独立定义。
 
 ##### 设计意图
 
 - 系统仿真时，某些模块可能尚未准备好或不需要参与仿真
-- 若简单地将模块输入悬空，内部逻辑可能产生 X 态传播，或输出非法值导致总线 hang 住
-- SHELL_MODE 将整个模块变为空壳，所有输出接固定安全值，彻底隔离该模块
+- SHELL_MODE 将整个设计树变为空壳，所有输出接固定安全值，彻底隔离
+- 由顶层一处控制，避免每个子模块各自为政
 
 ##### 实现规范
 
-1. **参数声明**：每个模块顶层必须声明 `parameter P_SHELL_MODE = 0`
-2. **generate 隔离**：使用 `generate if (P_SHELL_MODE) ... else ... endgenerate` 将空壳逻辑与正常逻辑完全隔离
-3. **输出信号 tie-off 规则**：
-   - **握手 ready 信号**（含 `ready`/`rdy` 的输出）：接 `1'b1`，表示本模块始终准备好接收，不会阻塞上游
-   - **握手 valid 信号**（含 `valid`/`vld` 的输出）：接 `1'b0`，表示本模块无有效数据产出
-   - **数据信号**（`data`/`addr`/`len` 等）：接 `'0`（全零）
-   - **中断/错误信号**：接 `1'b0`（不触发）
+1. **顶层参数声明**：仅在顶层模块声明 `parameter P_SHELL_MODE = 0`
+2. **顶层传递**：顶层将 `P_SHELL_MODE` 值通过例化端口传递给每个子模块
+3. **子模块接收**：子模块接收 shell 状态作为 parameter（默认值跟随顶层），使用 `generate if/else` 隔离逻辑
+4. **输出信号 tie-off 规则**（空壳分支内）：
+   - **握手 ready 信号**：接 `1'b1`，表示本模块始终准备好接收
+   - **握手 valid 信号**：接 `1'b0`，表示本模块无有效数据产出
+   - **数据信号**（`data`/`addr`/`len` 等）：接 `'0`
+   - **中断/错误信号**：接 `1'b0`
    - **状态信号**：接空闲状态值
-4. **输入处理**：空壳模式下所有输入未使用，综合工具会自动优化
 5. **子模块例化**：空壳分支内不例化任何子模块，纯 wire 赋值
+
+##### 简化示例
+
+```verilog
+// === 顶层: 唯一声明 P_SHELL_MODE 的地方 ===
+module eth_mac_top #(
+    parameter P_SHELL_MODE = 0
+) (
+    ...
+);
+    // 传递给子模块
+    mac_tx #(.P_SHELL_MODE(P_SHELL_MODE)) u_mac_tx (...);
+    mac_rx #(.P_SHELL_MODE(P_SHELL_MODE)) u_mac_rx (...);
+    ...
+endmodule
+
+// === 子模块: 不声明 P_SHELL_MODE，只接收 ===
+module mac_tx #(
+    parameter P_SHELL_MODE = 0   // 从顶层继承，不独立
+) (
+    ...
+);
+    generate
+        if (P_SHELL_MODE) begin : gen_shell
+            assign gmii_txd   = 8'd0;
+            assign gmii_tx_en = 1'b0;
+            ...
+        end else begin : gen_active
+            // normal logic
+        end
+    endgenerate
+endmodule
+```
 
 ##### 代码模板
 
 ```verilog
-module agdc_example #(
-    parameter P_DATA_WIDTH  = 32,
-    parameter P_SHELL_MODE  = 0      // 1 = shell mode, bypass all internal logic
+// === 顶层: 唯一的 SHELL_MODE 声明和传递点 ===
+module eth_mac_top #(
+    parameter P_SHELL_MODE  = 0
 ) (
-    input  wire                        core_clk,
-    input  wire                        rst_n,
-    // Upstream handshake
-    input  wire                        pready,
-    output wire                        pvalid,
-    output wire [P_DATA_WIDTH-1:0]     pdata,
-    // Downstream handshake
-    output wire                        sready,
-    input  wire                        svalid,
-    input  wire [P_DATA_WIDTH-1:0]     sdata,
-    // Status
-    output wire                        interrupt
+    input  wire        hclk,
+    input  wire        hresetn,
+    input  wire [31:0] hwdata,
+    output wire [31:0] hrdata
 );
 
-    //--------------------------------------------------------------------------
-    // Shell Mode: tie outputs to safe fixed values, no internal logic
-    //--------------------------------------------------------------------------
+    // 传递给所有子模块
+    sub_module_a #(.P_SHELL_MODE(P_SHELL_MODE)) u_a (
+        .clk   (hclk),
+        .rst_n (hresetn),
+        .in    (hwdata),
+        .out   (hrdata)
+    );
+
+endmodule
+
+// === 子模块: 接收 P_SHELL_MODE，不独立声明 ===
+module sub_module_a #(
+    parameter P_DATA_WIDTH = 32,
+    parameter P_SHELL_MODE = 0     // 从顶层传入，非独立定义
+) (
+    input  wire                     clk,
+    input  wire                     rst_n,
+    input  wire [P_DATA_WIDTH-1:0]  in,
+    output reg  [P_DATA_WIDTH-1:0]  out
+);
+
     generate
         if (P_SHELL_MODE) begin : gen_shell
-
-            // Handshake: upstream — not ready to accept, no valid output
-            assign sready  = 1'b0;                     // backpressure: not ready
-            assign pvalid  = 1'b0;                     // no valid data produced
-            assign pdata   = {P_DATA_WIDTH{1'b0}};     // data tied to 0
-
-            // Status / interrupt
-            assign interrupt = 1'b0;                   // no interrupt
-
-            // Unused inputs are optimized away by synthesis
-
-        //--------------------------------------------------------------------------
-        // Active Mode: normal functional logic
-        //--------------------------------------------------------------------------
+            assign out = {P_DATA_WIDTH{1'b0}};
         end else begin : gen_active
-
-            // ... normal RTL implementation ...
-
-            // Example handshake logic
-            assign sready  = ~fifo_full;
-            assign pvalid  = fifo_not_empty;
-            assign pdata   = fifo_rdata;
-
-            // ... submodule instantiations ...
-
+            always @(posedge clk or negedge rst_n) begin
+                if (!rst_n)
+                    out <= {P_DATA_WIDTH{1'b0}};
+                else
+                    out <= in;
+            end
         end
     endgenerate
 
 endmodule
-```
-
 ##### 信号 tie-off 速查表
 
 | 信号类型 | 方向 | SHELL_MODE 值 | 说明 |
@@ -496,30 +520,24 @@ endmodule
 
 ##### 顶层集成建议
 
-在顶层 `agdc_top` 中，通过系统级宏定义统一控制所有子模块的 SHELL_MODE：
+顶层是系统中唯一声明 `P_SHELL_MODE` 的地方。通过参数传递给所有子模块：
 
 ```verilog
-// agdc_top.v
-`ifdef AGDC_SHELL_MODE
-    localparam LP_SHELL_MODE = 1;
-`else
-    localparam LP_SHELL_MODE = 0;
-`endif
-
-agdc_module_a #(
-    .P_SHELL_MODE (LP_SHELL_MODE)
-) u_module_a (
+// 顶层
+module eth_mac_top #(
+    parameter P_SHELL_MODE = 0       // 唯一定义点
+) (
     ...
 );
-
-agdc_module_b #(
-    .P_SHELL_MODE (LP_SHELL_MODE)
-) u_module_b (
+    // 传递给所有子模块
+    mac_tx  #(.P_SHELL_MODE(P_SHELL_MODE)) u_mac_tx (...);
+    mac_rx  #(.P_SHELL_MODE(P_SHELL_MODE)) u_mac_rx (...);
+    crc32   #(.P_SHELL_MODE(P_SHELL_MODE)) u_crc32  (...);
     ...
-);
+endmodule
 ```
 
-仿真时通过 `+define+AGDC_SHELL_MODE` 一键切换全系统空壳模式。也可以按模块粒度单独控制（如只 shell 掉某个子模块，其余保持正常）。
+仿真时通过 `+define+ETH_SHELL_MODE` 或直接修改顶层 parameter 值一键切换全系统空壳。按模块粒度单独控制时，只改对应模块的参数值即可。
 
 #### 时序与 STA
 
