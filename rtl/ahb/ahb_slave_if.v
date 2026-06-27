@@ -2,23 +2,14 @@
 // Module: AHB_SLAVE_IF
 // File:    ahb_slave_if.v
 // Author:  ETH_Design Team
-// Version: v2.0
+// Version: v2.1
 // Date:    2026-06-27
 //
 // Description:
 //   AMBA 2.0 AHB Slave interface for CSR register access.
-//   Proper two-phase pipelined implementation:
-//     Phase 1 (Address):  Master drives HADDR/HWRITE/HSEL/HTRANS.
-//                          Slave registers address on rising edge when HREADY=1
-//                          and a valid transfer is requested.
-//     Phase 2 (Data):     Next cycle. Slave drives HRDATA (read) or samples
-//                          HWDATA (write). HREADY=0 inserts wait states.
-//
-//   Timing: 2-cycle minimum per access (addr phase + data phase).
-//           Zero internal wait states → HREADY always high after reset.
-//
-// Reset Strategy: Asynchronous reset, active low (hresetn).
-// Clock: hclk (AHB bus clock).
+//   Two-phase pipelined: Phase1=Address, Phase2=Data.
+//   Supports 32-bit accesses only. Byte/halfword = ERROR.
+//   Zero wait state (HREADY always high). Single-beat only.
 // ============================================================================
 
 module ahb_slave_if #(
@@ -27,49 +18,45 @@ module ahb_slave_if #(
     input  wire        hclk,
     input  wire        hresetn,
 
-    // AHB Slave bus — Phase 1 (Address/Control) inputs
     input  wire        hsel,
-    input  wire [12:0] haddr,       // 13-bit address
+    input  wire [12:0] haddr,
     input  wire        hwrite,
     input  wire [31:0] hwdata,
-    input  wire [ 1:0] htrans,      // 00=IDLE, 01=BUSY, 10=NONSEQ, 11=SEQ
-    input  wire [ 2:0] hsize,
+    input  wire [ 1:0] htrans,
+    input  wire [ 2:0] hsize,          // 000=8b, 001=16b, 010=32b
     input  wire [ 2:0] hburst,
 
-    // AHB Slave bus — Phase 2 (Data) outputs
     output wire [31:0] hrdata,
     output wire        hready,
-    output wire        hresp,       // 0=OKAY, 1=ERROR
+    output wire        hresp,          // 0=OKAY, 1=ERROR
 
-    // Register access ports (to reg_file)
-    output wire        reg_wr_en,     // pulsed high for 1 cycle in data phase
-    output wire [12:0] reg_addr,      // registered address (stable in data phase)
-    output wire [31:0] reg_wr_data,   // write data (passed through from hwdata)
-    input  wire [31:0] reg_rd_data    // read data from register file
+    output wire        reg_wr_en,
+    output wire [12:0] reg_addr,
+    output wire [31:0] reg_wr_data,
+    input  wire [31:0] reg_rd_data
 );
 
     //--------------------------------------------------------------------------
-    // Internal Signals
+    // Phase 1 → Phase 2 registers
     //--------------------------------------------------------------------------
-    // Phase 1 → Phase 2 registered signals
-    reg        access_valid;          // 1 = a valid access was captured in Phase 1
-    reg [12:0] addr_reg;              // Registered address (Phase 1 capture)
-    reg        write_reg;             // Registered write flag
-    // Note: wdata is NOT captured in Phase 1 — per AHB spec, HWDATA is only
-    // valid in Phase 2 (data phase). It passes through combinationally below.
-
-    // Read data is combinational (see assign below)
-    reg        hready_reg;
+    reg        access_valid;
+    reg [12:0] addr_reg;
+    reg        write_reg;
+    reg        size_ok;               // 1 = HSIZE is valid (32-bit only)
+    reg        burst_ok;              // 1 = HBURST is SINGLE or INCR
     reg        hresp_reg;
 
-    //--------------------------------------------------------------------------
-    // Transfer detection
-    //--------------------------------------------------------------------------
     wire transfer_active;
     assign transfer_active = hsel && htrans[1];    // NONSEQ or SEQ
 
-    //--------------------------------------------------------------------------
-    // Shell Mode
+    // 32-bit access only
+    wire hsize_ok;
+    assign hsize_ok = (hsize == 3'd2);
+
+    // Single-beat or INCR (burst not supported for CSR)
+    wire hburst_ok;
+    assign hburst_ok = (hburst == 3'd0) || (hburst == 3'd1);
+
     //--------------------------------------------------------------------------
     generate
         if (P_SHELL_MODE) begin : gen_shell
@@ -82,19 +69,22 @@ module ahb_slave_if #(
         end else begin : gen_active
 
             //------------------------------------------------------------------
-            // Phase 1: Capture address on rising edge when transfer starts
+            // Phase 1: Capture address + check HSIZE/HBURST validity
             //------------------------------------------------------------------
             always @(posedge hclk or negedge hresetn) begin
                 if (hresetn == 1'b0) begin
                     access_valid <= 1'b0;
                     addr_reg     <= 13'd0;
                     write_reg    <= 1'b0;
+                    size_ok      <= 1'b0;
+                    burst_ok     <= 1'b0;
                 end else begin
                     if (transfer_active) begin
-                        // Phase 1: Capture address and control (hwdata NOT valid yet)
                         access_valid <= 1'b1;
                         addr_reg     <= haddr;
                         write_reg    <= hwrite;
+                        size_ok      <= hsize_ok;
+                        burst_ok     <= hburst_ok;
                     end else begin
                         access_valid <= 1'b0;
                     end
@@ -102,26 +92,18 @@ module ahb_slave_if #(
             end
 
             //------------------------------------------------------------------
-            // Phase 2: Respond with data in the clock cycle after address capture
+            // Phase 2: Data response with HSIZE/HBURST error check
             //------------------------------------------------------------------
             always @(posedge hclk or negedge hresetn) begin
                 if (hresetn == 1'b0) begin
-                    hready_reg <= 1'b1;
                     hresp_reg  <= 1'b0;
                 end else begin
-                    // Phase 2 Data Response:
-                    // After address is captured (access_valid=1), respond in the
-                    // next cycle. For reads: drive reg_rd_data. For writes: ack.
-                    // Insert 1 wait state: hready=0 during data preparation,
-                    // hready=1 when data is ready.
                     if (access_valid) begin
-                        // Data phase — respond to the captured access
-                        // hrdata is combinational from reg_rd_data (see assign)
-                        hready_reg <= 1'b1;              // Data valid this cycle
-                        hresp_reg  <= 1'b0;              // OKAY
+                        // Two-cycle response (OKAY or ERROR)
+                        // hresp: 0=OKAY, 1=ERROR for unsupported size/burst
+                        hresp_reg <= ~(size_ok && burst_ok);
                     end else begin
-                        hready_reg <= 1'b1;              // Ready for next access
-                        hresp_reg  <= 1'b0;
+                        hresp_reg <= 1'b0;
                     end
                 end
             end
@@ -129,18 +111,15 @@ module ahb_slave_if #(
             //------------------------------------------------------------------
             // Outputs
             //------------------------------------------------------------------
-            // Read data: combinational from reg_rd_data during data phase
-            // This avoids the 1-cycle pipeline delay of registered hrdata
-            assign hrdata     = (access_valid && ~write_reg) ? reg_rd_data : 32'd0;
-            assign hready     = hready_reg;
+            // hrdata: combinational from reg_rd_data (zero when in error)
+            assign hrdata     = (access_valid && ~write_reg && size_ok && burst_ok) ? reg_rd_data : 32'd0;
+            assign hready     = 1'b1;     // Zero wait state
             assign hresp      = hresp_reg;
 
-            // Write strobe: pulsed in Phase 2 (data phase).
-            // HWDATA is valid NOW (Phase 2), pass through combinationally.
-            // reg_addr is the Phase 1-captured address, stable in Phase 2.
-            assign reg_wr_en  = access_valid && write_reg;
-            assign reg_addr   = addr_reg;
-            assign reg_wr_data = hwdata;               // hwdata valid only in Phase 2
+            // Write: pass hwdata through in Phase 2 (data phase)
+            assign reg_wr_en   = access_valid && write_reg && size_ok && burst_ok;
+            assign reg_addr    = addr_reg;
+            assign reg_wr_data = hwdata;
 
         end
     endgenerate
