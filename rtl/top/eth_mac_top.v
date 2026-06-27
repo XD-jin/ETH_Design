@@ -84,6 +84,7 @@ module eth_mac_top #(
     // It is fully asynchronous to hclk and gmii_rx_clk.
     //--------------------------------------------------------------------------
     wire gmii_rx_clk;
+    wire rdata_valid;
     assign gmii_rx_clk = rgmii_rxc;           // RX clock from PHY
 
     // DMA → AHB Master interconnect
@@ -343,7 +344,8 @@ module eth_mac_top #(
         .htrans_o       (hm_trans_o),
         .hrdata_i       (hm_rdata_i),
         .hready_i       (hm_ready_i),
-        .hresp_i        (hm_resp_i)
+        .hresp_i        (hm_resp_i),
+        .rdata_valid    (rdata_valid)
     );
 
     //--------------------------------------------------------------------------

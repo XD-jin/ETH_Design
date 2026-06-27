@@ -42,7 +42,8 @@ module ahb_master_if #(
     output wire [ 1:0] htrans_o,
     input  wire [31:0] hrdata_i,
     input  wire        hready_i,
-    input  wire        hresp_i
+    input  wire        hresp_i,
+    output wire        rdata_valid
 );
 
     localparam ST_IDLE = 2'd0;
@@ -80,6 +81,7 @@ module ahb_master_if #(
             assign dma_ready  = 1'b0;
             assign dma_error  = 1'b0;
         end else begin : gen_active
+    reg rdata_valid;
 
             //------------------------------------------------------------------
             // State Register
@@ -126,6 +128,7 @@ module ahb_master_if #(
                     ready_reg     <= 1'b0;
                     error_reg     <= 1'b0;
                     abort_reg     <= 1'b0;
+                    rdata_valid   <= 1'b0;
                 end else begin
                     ready_reg <= 1'b0;
                     error_reg <= 1'b0;
@@ -139,11 +142,13 @@ module ahb_master_if #(
                                 burst_cnt_reg <= dma_burst_len;
                                 beat_first    <= 1'b1;
                                 abort_reg     <= 1'b0;
+                                rdata_valid   <= 1'b0;
                             end
                         end
 
                         ST_ADDR: begin
                             beat_first <= 1'b0;
+                            rdata_valid <= 1'b0;
                             // Pre-update wdata for next beat (combinational from DMA)
                             if (write_reg)
                                 wdata_reg <= dma_wdata;
@@ -153,6 +158,7 @@ module ahb_master_if #(
                             if (hready_i) begin
                                 if (~write_reg)
                                     hrdata_reg <= hrdata_i;
+                                    rdata_valid <= 1'b1;
                                 ready_reg <= 1'b1;
                                 error_reg <= hresp_i;
                                 if (hresp_i)

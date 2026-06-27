@@ -38,6 +38,7 @@ module dma_controller #(
     output wire [31:0] ahb_addr,
     output wire [31:0] ahb_wdata,
     input  wire [31:0] ahb_rdata,
+    input  wire        rdata_valid,
     output wire [ 2:0] ahb_burst,
     output wire        ahb_write,
     input  wire        ahb_ready,
@@ -106,7 +107,7 @@ module dma_controller #(
         .desc_len     (ch0_tx_desc_len),
         .tx_pbl       (cfg_dma_mode[7:3]),
         .ahb_req      (tx0_ahb_req),
-        .ahb_grant    (bus_to_tx && (tx_arb_grant == 2'd0)),
+        .ahb_grant    (ahb_grant && bus_to_tx && (tx_arb_grant == 2'd0)),
         .ahb_addr     (tx0_ahb_addr),
         .ahb_burst    (tx0_ahb_burst),
 .ahb_rdata    (ahb_rdata),
@@ -169,7 +170,7 @@ module dma_controller #(
         .rx_pbl       (cfg_dma_mode[11:8]),
         .rx_buf_size  (ch0_rx_buf_size),
         .ahb_req      (rx0_ahb_req),
-        .ahb_grant    (~bus_to_tx && (rx_arb_grant == 2'd0)),
+        .ahb_grant    (ahb_grant && ~bus_to_tx && (rx_arb_grant == 2'd0)),
         .ahb_addr     (rx0_ahb_addr),
         .ahb_wdata    (rx0_ahb_wdata),
         .ahb_burst    (rx0_ahb_burst),
@@ -260,10 +261,10 @@ module dma_controller #(
             // AHB signal mux: select from granted channel
             //------------------------------------------------------------------
             // TX channels (reads)
-            wire tx_sel_ch0 = bus_to_tx && (tx_arb_grant == 2'd0);
+            wire tx_sel_ch0 = ahb_grant && bus_to_tx && (tx_arb_grant == 2'd0);
             wire tx_sel_ch1 = bus_to_tx && (tx_arb_grant == 2'd1);
             // RX channels (writes)
-            wire rx_sel_ch0 = ~bus_to_tx && (rx_arb_grant == 2'd0);
+            wire rx_sel_ch0 = ahb_grant && ~bus_to_tx && (rx_arb_grant == 2'd0);
             wire rx_sel_ch1 = ~bus_to_tx && (rx_arb_grant == 2'd1);
 
             assign ahb_addr  = tx_sel_ch0 ? tx0_ahb_addr :

@@ -31,6 +31,7 @@ module dma_tx_channel #(
     output wire [31:0] ahb_addr,
     output wire [ 2:0] ahb_burst,
     input  wire [31:0] ahb_rdata,
+    input  wire        rdata_valid,
     input  wire        ahb_ready,
     input  wire        ahb_error,
 
@@ -115,12 +116,12 @@ module dma_tx_channel #(
             //------------------------------------------------------------------
             always @(*) begin
                 case (curr_st)
-                    ST_IDLE:  next_st = (ch_start && ahb_grant) ? ST_DESC0 : ST_IDLE;
-                    ST_DESC0: next_st = (ahb_ready && ahb_grant) ? ST_DESC1 : ST_DESC0;
-                    ST_DESC1: next_st = (ahb_ready && ahb_grant) ? ST_DESC2 : ST_DESC1;
-                    ST_DESC2: next_st = (ahb_ready && ahb_grant) ? ST_DESC3 : ST_DESC2;
+                    ST_IDLE:  next_st = ch_start ? ST_DESC0 : ST_IDLE;
+                    ST_DESC0: next_st = (rdata_valid && ahb_grant) ? ST_DESC1 : ST_DESC0;
+                    ST_DESC1: next_st = (rdata_valid && ahb_grant) ? ST_DESC2 : ST_DESC1;
+                    ST_DESC2: next_st = (rdata_valid && ahb_grant) ? ST_DESC3 : ST_DESC2;
                     ST_DESC3: begin
-                        if (ahb_ready) begin
+                        if (rdata_valid) begin
                             if (own_bit)
                                 next_st = ST_XFER;
                             else
@@ -248,7 +249,7 @@ module dma_tx_channel #(
             assign in_xfer_phase = (curr_st == ST_XFER);
 
             // Only request bus when arbiter has granted access
-            assign ahb_req   = ahb_grant && (in_desc_phase || in_xfer_phase);
+            assign ahb_req   = in_desc_phase || in_xfer_phase;
             // Descriptor address increments by 4 each word; buffer address from buf1/buf2
             assign ahb_addr  = in_desc_phase ? desc_addr :
                                (active_buf ? buf2_addr + byte_cnt : buf1_addr + byte_cnt);
