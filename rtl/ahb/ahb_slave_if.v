@@ -12,7 +12,7 @@ module ahb_slave_if #(
 ) (
     input  wire        hclk, hresetn,
     input  wire        hsel,
-    input  wire [11:0] haddr,
+    input  wire [12:0] haddr,       // 13-bit = 8KB address space
     input  wire        hwrite,
     input  wire [31:0] hwdata,
     input  wire [ 1:0] htrans,
@@ -24,7 +24,7 @@ module ahb_slave_if #(
 
     // Register read/write ports (to internal register file)
     output wire        reg_wr_en,
-    output wire [11:0] reg_addr,
+    output wire [12:0] reg_addr,
     output wire [31:0] reg_wr_data,
     input  wire [31:0] reg_rd_data
 );
@@ -38,7 +38,7 @@ module ahb_slave_if #(
             assign hready     = 1'b1;
             assign hresp      = 1'b0;
             assign reg_wr_en  = 1'b0;
-            assign reg_addr   = 12'd0;
+            assign reg_addr   = 13'd0;
             assign reg_wr_data = 32'd0;
         end else begin : gen_active
             // Registered output for read data

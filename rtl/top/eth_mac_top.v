@@ -40,7 +40,7 @@ module eth_mac_top #(
     input  wire        hclk,
     input  wire        hresetn,
     input  wire        hsel,
-    input  wire [11:0] haddr,
+    input  wire [12:0] haddr,
     input  wire        hwrite,
     input  wire [31:0] hwdata,
     input  wire [ 1:0] htrans,
@@ -89,8 +89,39 @@ module eth_mac_top #(
     //--------------------------------------------------------------------------
     // Internal Interconnects
     //--------------------------------------------------------------------------
-    // CSR register read data bus
+    // AHB Slave → Register File
+    wire        reg_wr_en;
+    wire [12:0] reg_addr;
+    wire [31:0] reg_wr_data;
     wire [31:0] reg_rd_data;
+
+    // Register File → Sub-module configuration buses
+    wire [31:0] cfg_mac_config;
+    wire [31:0] cfg_mac_packet_filter;
+    wire [13:0] cfg_mac_watchdog_limit;
+    wire [63:0] cfg_mac_hash_table;
+    wire [15:0] cfg_mac_q0_tx_pause_time, cfg_mac_q1_tx_pause_time;
+    wire        cfg_mac_q0_tx_fc_en, cfg_mac_q1_tx_fc_en;
+    wire        cfg_mac_rx_fc_en;
+    wire [ 3:0] cfg_mac_intr_en;
+    wire [ 3:0] mac_intr_status_w;
+    wire [47:0] cfg_mac_addr0, cfg_mac_addr1, cfg_mac_addr2, cfg_mac_addr3;
+    wire [31:0] cfg_mtl_op_mode;
+    wire [ 3:0] cfg_mtl_rxq_dma_map;
+    wire [31:0] cfg_mtl_txq0_op_mode, cfg_mtl_txq1_op_mode;
+    wire [31:0] cfg_mtl_rxq0_op_mode, cfg_mtl_rxq1_op_mode;
+    wire [31:0] mtl_intr_status_w, mtl_txq0_uf_w, mtl_txq1_uf_w, mtl_rxq0_mp_w, mtl_rxq1_mp_w;
+    wire [31:0] cfg_dma_mode, cfg_dma_sysbus_mode;
+    wire [ 3:0] cfg_dma_intr_en;
+    wire [15:0] cfg_dma_tx_intr_timer, cfg_dma_rx_intr_timer;
+    wire [31:0] cfg_dma_ch0_ctrl, cfg_dma_ch0_tx_ctrl, cfg_dma_ch0_rx_ctrl;
+    wire [31:0] cfg_dma_ch0_tx_desc_addr, cfg_dma_ch0_rx_desc_addr;
+    wire [ 7:0] cfg_dma_ch0_tx_tail, cfg_dma_ch0_rx_tail;
+    wire [31:0] cfg_dma_ch1_ctrl, cfg_dma_ch1_tx_ctrl, cfg_dma_ch1_rx_ctrl;
+    wire [31:0] cfg_dma_ch1_tx_desc_addr, cfg_dma_ch1_rx_desc_addr;
+    wire [ 7:0] cfg_dma_ch1_tx_tail, cfg_dma_ch1_rx_tail;
+    wire [31:0] dma_ch0_status_w, dma_ch1_status_w;
+    wire [31:0] mac_version_w;
     // DMA → MTL (ATI)
     wire        ati_val, ati_rdy;
     wire [31:0] ati_data;
@@ -151,11 +182,83 @@ module eth_mac_top #(
         .hrdata       (hrdata),
         .hready       (hready),
         .hresp        (hresp),
-        .reg_wr_en    (),
-        .reg_addr     (),
-        .reg_wr_data  (),
+        .reg_wr_en    (reg_wr_en),
+        .reg_addr     (reg_addr),
+        .reg_wr_data  (reg_wr_data),
         .reg_rd_data  (reg_rd_data)
     );
+
+    //--------------------------------------------------------------------------
+    // Register File (CSR → sub-module config wires)
+    //--------------------------------------------------------------------------
+    reg_file #(.P_SHELL_MODE(P_SHELL_MODE))
+    u_reg_file
+    (
+        .hclk               (hclk),
+        .hresetn            (hresetn),
+        .reg_wr_en          (reg_wr_en),
+        .reg_addr           (reg_addr),
+        .reg_wr_data        (reg_wr_data),
+        .reg_rd_data        (reg_rd_data),
+        .mac_config         (cfg_mac_config),
+        .mac_packet_filter  (cfg_mac_packet_filter),
+        .mac_watchdog_limit (cfg_mac_watchdog_limit),
+        .mac_hash_table     (cfg_mac_hash_table),
+        .mac_q0_tx_pause_time (cfg_mac_q0_tx_pause_time),
+        .mac_q0_tx_fc_enable  (cfg_mac_q0_tx_fc_en),
+        .mac_q1_tx_fc_enable  (cfg_mac_q1_tx_fc_en),
+        .mac_rx_fc_enable     (cfg_mac_rx_fc_en),
+        .mac_intr_enable      (cfg_mac_intr_en),
+        .mac_intr_status      (mac_intr_status_w),
+        .mac_addr0            (cfg_mac_addr0),
+        .mac_addr1            (cfg_mac_addr1),
+        .mac_addr2            (cfg_mac_addr2),
+        .mac_addr3            (cfg_mac_addr3),
+        .mtl_op_mode          (cfg_mtl_op_mode),
+        .mtl_rxq_dma_map      (cfg_mtl_rxq_dma_map),
+        .mtl_txq0_op_mode     (cfg_mtl_txq0_op_mode),
+        .mtl_txq1_op_mode     (cfg_mtl_txq1_op_mode),
+        .mtl_rxq0_op_mode     (cfg_mtl_rxq0_op_mode),
+        .mtl_rxq1_op_mode     (cfg_mtl_rxq1_op_mode),
+        .mtl_intr_status      (mtl_intr_status_w),
+        .mtl_txq0_underflow    (mtl_txq0_uf_w),
+        .mtl_txq1_underflow    (mtl_txq1_uf_w),
+        .mtl_rxq0_missed       (mtl_rxq0_mp_w),
+        .mtl_rxq1_missed       (mtl_rxq1_mp_w),
+        .dma_mode             (cfg_dma_mode),
+        .dma_sysbus_mode      (cfg_dma_sysbus_mode),
+        .dma_intr_enable      (cfg_dma_intr_en),
+        .dma_intr_status      (),
+        .dma_tx_intr_timer    (cfg_dma_tx_intr_timer),
+        .dma_rx_intr_timer    (cfg_dma_rx_intr_timer),
+        .dma_ch0_ctrl         (cfg_dma_ch0_ctrl),
+        .dma_ch0_tx_ctrl      (cfg_dma_ch0_tx_ctrl),
+        .dma_ch0_rx_ctrl      (cfg_dma_ch0_rx_ctrl),
+        .dma_ch0_tx_desc_addr (cfg_dma_ch0_tx_desc_addr),
+        .dma_ch0_rx_desc_addr (cfg_dma_ch0_rx_desc_addr),
+        .dma_ch0_tx_desc_tail (cfg_dma_ch0_tx_tail),
+        .dma_ch0_rx_desc_tail (cfg_dma_ch0_rx_tail),
+        .dma_ch0_status       (dma_ch0_status_w),
+        .dma_ch1_ctrl         (cfg_dma_ch1_ctrl),
+        .dma_ch1_tx_ctrl      (cfg_dma_ch1_tx_ctrl),
+        .dma_ch1_rx_ctrl      (cfg_dma_ch1_rx_ctrl),
+        .dma_ch1_tx_desc_addr (cfg_dma_ch1_tx_desc_addr),
+        .dma_ch1_rx_desc_addr (cfg_dma_ch1_rx_desc_addr),
+        .dma_ch1_tx_desc_tail (cfg_dma_ch1_tx_tail),
+        .dma_ch1_rx_desc_tail (cfg_dma_ch1_rx_tail),
+        .dma_ch1_status       (dma_ch1_status_w),
+        .mac_version          (mac_version_w)
+    );
+
+    // Status wire tie-offs (connected when sub-modules assert actual values)
+    assign mac_intr_status_w = 4'd0;
+    assign mtl_intr_status_w = 32'd0;
+    assign mtl_txq0_uf_w     = 32'd0;
+    assign mtl_txq1_uf_w     = 32'd0;
+    assign mtl_rxq0_mp_w     = 32'd0;
+    assign mtl_rxq1_mp_w     = 32'd0;
+    assign dma_ch0_status_w  = 32'd0;
+    assign dma_ch1_status_w  = 32'd0;
 
     //--------------------------------------------------------------------------
     // DMA Controller
@@ -165,30 +268,30 @@ module eth_mac_top #(
     (
         .clk                (hclk),
         .rst_n              (hresetn),
-        .cfg_dma_mode       (32'd0),
-        .cfg_dma_sysbus_mode (32'd0),
-        .cfg_dma_intr_enable (32'd0),
-        .cfg_coalesce_timer (16'd1000),
+        .cfg_dma_mode       (cfg_dma_mode),
+        .cfg_dma_sysbus_mode (cfg_dma_sysbus_mode),
+        .cfg_dma_intr_enable (cfg_dma_intr_en),
+        .cfg_coalesce_timer (cfg_dma_tx_intr_timer),
         // Channel 0
-        .ch0_tx_start       (1'b1),
-        .ch0_tx_desc_base   (32'd0),
-        .ch0_tx_desc_tail   (8'd0),
+        .ch0_tx_start       (cfg_dma_ch0_tx_ctrl[0]),
+        .ch0_tx_desc_base   (cfg_dma_ch0_tx_desc_addr),
+        .ch0_tx_desc_tail   (cfg_dma_ch0_tx_tail),
         .ch0_tx_desc_len    (8'd64),
-        .ch0_rx_start       (1'b1),
-        .ch0_rx_desc_base   (32'd0),
-        .ch0_rx_desc_tail   (8'd0),
+        .ch0_rx_start       (cfg_dma_ch0_rx_ctrl[0]),
+        .ch0_rx_desc_base   (cfg_dma_ch0_rx_desc_addr),
+        .ch0_rx_desc_tail   (cfg_dma_ch0_rx_tail),
         .ch0_rx_desc_len    (8'd64),
-        .ch0_rx_buf_size    (14'd2048),
+        .ch0_rx_buf_size    (cfg_dma_ch0_rx_ctrl[14:1]),
         // Channel 1
-        .ch1_tx_start       (1'b1),
-        .ch1_tx_desc_base   (32'd0),
-        .ch1_tx_desc_tail   (8'd0),
+        .ch1_tx_start       (cfg_dma_ch1_tx_ctrl[0]),
+        .ch1_tx_desc_base   (cfg_dma_ch1_tx_desc_addr),
+        .ch1_tx_desc_tail   (cfg_dma_ch1_tx_tail),
         .ch1_tx_desc_len    (8'd64),
-        .ch1_rx_start       (1'b1),
-        .ch1_rx_desc_base   (32'd0),
-        .ch1_rx_desc_tail   (8'd0),
+        .ch1_rx_start       (cfg_dma_ch1_rx_ctrl[0]),
+        .ch1_rx_desc_base   (cfg_dma_ch1_rx_desc_addr),
+        .ch1_rx_desc_tail   (cfg_dma_ch1_rx_tail),
         .ch1_rx_desc_len    (8'd64),
-        .ch1_rx_buf_size    (14'd2048),
+        .ch1_rx_buf_size    (cfg_dma_ch1_rx_ctrl[14:1]),
         // AHB
         .ahb_req            (),
         .ahb_grant          (1'b1),
@@ -256,8 +359,8 @@ module eth_mac_top #(
         .mri_eop           (mri_eop),
         .rx_da_valid       (rx_da_valid),
         .rx_da             (rx_da),
-        .cfg_mac_addr0     (48'd0),
-        .cfg_mac_addr1     (48'd0),
+        .cfg_mac_addr0     (cfg_mac_addr0),
+        .cfg_mac_addr1     (cfg_mac_addr1),
         .ari_val           (ari_val),
         .ari_rdy           (ari_rdy),
         .ari_data          (ari_data),
@@ -278,11 +381,11 @@ module eth_mac_top #(
     (
         .gmii_tx_clk      (gmii_tx_clk),
         .rst_n            (hresetn),
-        .tx_enable        (1'b1),
-        .cfg_ifg          (2'd0),
-        .cfg_jabber_disable (1'b0),
+        .tx_enable        (cfg_mac_config[3]),        // TE
+        .cfg_ifg          (cfg_mac_config[6:5]),       // IFG
+        .cfg_jabber_disable (cfg_mac_config[4]),        // JD
         .cfg_crc_pad_ctl  (1'b0),
-        .cfg_preamble_short (1'b0),
+        .cfg_preamble_short (cfg_mac_config[1]),        // PRELEN
         .mti_val          (mti_val),
         .mti_rdy          (mti_rdy),
         .mti_data         (mti_data),
@@ -306,11 +409,11 @@ module eth_mac_top #(
     (
         .gmii_rx_clk       (gmii_rx_clk),
         .rst_n             (hresetn),
-        .rx_enable         (1'b1),
-        .cfg_crc_strip     (1'b0),
-        .cfg_pad_strip     (1'b0),
+        .rx_enable         (cfg_mac_config[2]),        // RE
+        .cfg_crc_strip     (cfg_mac_config[0]),          // ACS
+        .cfg_pad_strip     (cfg_mac_config[0]),
         .cfg_watchdog_en   (1'b1),
-        .cfg_watchdog_limit (14'd2048),
+        .cfg_watchdog_limit (cfg_mac_watchdog_limit),
         .gmii_rxd          (mac_rxd),
         .gmii_rx_dv        (mac_rx_dv),
         .gmii_rx_er        (mac_rx_er),
@@ -371,15 +474,15 @@ module eth_mac_top #(
     (
         .clk               (gmii_rx_clk),
         .rst_n             (hresetn),
-        .cfg_promiscuous   (1'b0),
-        .cfg_pass_all_mcast (1'b0),
-        .cfg_disable_bcast (1'b0),
-        .cfg_da_invert     (1'b0),
-        .cfg_hash_mode     (1'b0),
-        .cfg_pass_ctrl     (1'b0),
-        .cfg_hash_mcast    (1'b0),
-        .cfg_mac_addr      (192'd0),
-        .cfg_hash_table    (64'd0),
+        .cfg_promiscuous   (cfg_mac_packet_filter[31]),        // RA
+        .cfg_pass_all_mcast (cfg_mac_packet_filter[5]),          // PMF
+        .cfg_disable_bcast (cfg_mac_packet_filter[6]),          // DBF
+        .cfg_da_invert     (cfg_mac_packet_filter[4]),          // DAIF
+        .cfg_hash_mode     (cfg_mac_packet_filter[10]),          // HPF
+        .cfg_pass_ctrl     (cfg_mac_packet_filter[7]),          // PCF
+        .cfg_hash_mcast    (cfg_mac_packet_filter[3]),          // HM
+        .cfg_mac_addr      ({cfg_mac_addr3, cfg_mac_addr2, cfg_mac_addr1, cfg_mac_addr0}),
+        .cfg_hash_table    (cfg_mac_hash_table),
         .rx_da_valid       (rx_da_valid),
         .rx_da             (rx_da),
         .rx_is_pause       (1'b0),
