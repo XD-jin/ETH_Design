@@ -59,6 +59,9 @@ module eth_mac_top #(
     input  wire        hm_ready_i,
     input  wire        hm_resp_i,
 
+    // GMII TX Clock (125MHz, from dedicated PLL)
+    input  wire        gmii_tx_clk,
+
     // Interrupt
     output wire        intr_o,
 
@@ -77,12 +80,10 @@ module eth_mac_top #(
 
     //--------------------------------------------------------------------------
     // Clock & Reset
+    // gmii_tx_clk is a top-level input port (125MHz from dedicated PLL).
+    // It is fully asynchronous to hclk and gmii_rx_clk.
     //--------------------------------------------------------------------------
-    wire gmii_tx_clk;
     wire gmii_rx_clk;
-    // NOTE: V1.0 simulation uses hclk as TX clock source for convenience.
-    // Production: gmii_tx_clk must come from dedicated 125MHz PLL, independent from hclk.
-    assign gmii_tx_clk = hclk;
     assign gmii_rx_clk = rgmii_rxc;           // RX clock from PHY
 
     //--------------------------------------------------------------------------
@@ -100,6 +101,7 @@ module eth_mac_top #(
     wire        ari_val, ari_rdy;
     wire [31:0] ari_data;
     wire        ari_sop, ari_eop;
+    wire        ari_queue;                    // Source RX queue select (from MTL)
     // MTL → MAC (MTI)
     wire        mti_val, mti_rdy;
     wire [ 7:0] mti_data;
@@ -167,6 +169,7 @@ module eth_mac_top #(
         .cfg_dma_sysbus_mode (32'd0),
         .cfg_dma_intr_enable (32'd0),
         .cfg_coalesce_timer (16'd1000),
+        // Channel 0
         .ch0_tx_start       (1'b1),
         .ch0_tx_desc_base   (32'd0),
         .ch0_tx_desc_tail   (8'd0),
@@ -175,6 +178,18 @@ module eth_mac_top #(
         .ch0_rx_desc_base   (32'd0),
         .ch0_rx_desc_tail   (8'd0),
         .ch0_rx_desc_len    (8'd64),
+        .ch0_rx_buf_size    (14'd2048),
+        // Channel 1
+        .ch1_tx_start       (1'b1),
+        .ch1_tx_desc_base   (32'd0),
+        .ch1_tx_desc_tail   (8'd0),
+        .ch1_tx_desc_len    (8'd64),
+        .ch1_rx_start       (1'b1),
+        .ch1_rx_desc_base   (32'd0),
+        .ch1_rx_desc_tail   (8'd0),
+        .ch1_rx_desc_len    (8'd64),
+        .ch1_rx_buf_size    (14'd2048),
+        // AHB
         .ahb_req            (),
         .ahb_grant          (1'b1),
         .ahb_addr           (hm_addr_o),
@@ -184,6 +199,7 @@ module eth_mac_top #(
         .ahb_write          (hm_write_o),
         .ahb_ready          (hm_ready_i),
         .ahb_error          (hm_resp_i),
+        // MTL interfaces
         .ati_val            (ati_val),
         .ati_rdy            (ati_rdy),
         .ati_data           (ati_data),
@@ -196,6 +212,7 @@ module eth_mac_top #(
         .ari_data           (ari_data),
         .ari_sop            (ari_sop),
         .ari_eop            (ari_eop),
+        .ari_queue          (ari_queue),
         .intr_o             (intr_o),
         .intr_status        ()
     );
@@ -247,7 +264,7 @@ module eth_mac_top #(
         .ari_sop           (ari_sop),
         .ari_eop           (ari_eop),
         .ari_be            (),
-        .ari_queue         (),
+        .ari_queue         (ari_queue),
         .rx_queue_not_empty (),
         .rx_fifo_level     (),
         .rx_overflow       ()
