@@ -85,6 +85,7 @@ module eth_mac_top #(
     //--------------------------------------------------------------------------
     wire gmii_rx_clk;
     assign hm_size_o = 3'd2;
+    assign hm_trans_o = 2'b00;
     assign gmii_rx_clk = rgmii_rxc;           // RX clock from PHY
 
     //--------------------------------------------------------------------------
