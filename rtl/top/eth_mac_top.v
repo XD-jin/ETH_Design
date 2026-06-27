@@ -84,9 +84,13 @@ module eth_mac_top #(
     // It is fully asynchronous to hclk and gmii_rx_clk.
     //--------------------------------------------------------------------------
     wire gmii_rx_clk;
-    assign hm_size_o = 3'd2;
-    assign hm_trans_o = 2'b00;
     assign gmii_rx_clk = rgmii_rxc;           // RX clock from PHY
+
+    // DMA → AHB Master interconnect
+    wire        dma_m_req, dma_m_grant;
+    wire [31:0] dma_m_addr, dma_m_wdata, dma_m_rdata;
+    wire [ 2:0] dma_m_burst;
+    wire        dma_m_write, dma_m_ready, dma_m_error;
 
     //--------------------------------------------------------------------------
     // Internal Interconnects
@@ -285,16 +289,16 @@ module eth_mac_top #(
         .ch1_rx_desc_tail   (cfg_dma_ch1_rx_tail),
         .ch1_rx_desc_len    (8'd64),
         .ch1_rx_buf_size    (cfg_dma_ch1_rx_ctrl[14:1]),
-        // AHB
-        .ahb_req            (),
-        .ahb_grant          (1'b1),
-        .ahb_addr           (hm_addr_o),
-        .ahb_wdata          (hm_wdata_o),
-        .ahb_rdata          (hm_rdata_i),
-        .ahb_burst          (hm_burst_o),
-        .ahb_write          (hm_write_o),
-        .ahb_ready          (hm_ready_i),
-        .ahb_error          (hm_resp_i),
+        // AHB → ahb_master_if
+        .ahb_req            (dma_m_req),
+        .ahb_grant          (dma_m_grant),
+        .ahb_addr           (dma_m_addr),
+        .ahb_wdata          (dma_m_wdata),
+        .ahb_rdata          (dma_m_rdata),
+        .ahb_burst          (dma_m_burst),
+        .ahb_write          (dma_m_write),
+        .ahb_ready          (dma_m_ready),
+        .ahb_error          (dma_m_error),
         // MTL interfaces
         .ati_val            (ati_val),
         .ati_rdy            (ati_rdy),
@@ -311,6 +315,35 @@ module eth_mac_top #(
         .ari_queue          (ari_queue),
         .intr_o             (intr_o),
         .intr_status        (dma_intr_status_w)
+    );
+
+    //--------------------------------------------------------------------------
+    // AHB Master Interface — DMA ↔ AHB Bus Protocol Engine
+    //--------------------------------------------------------------------------
+    ahb_master_if #(.P_SHELL_MODE(P_SHELL_MODE))
+    u_ahb_master
+    (
+        .hclk           (hclk),
+        .hresetn        (hresetn),
+        .dma_req        (dma_m_req),
+        .dma_grant      (dma_m_grant),
+        .dma_addr       (dma_m_addr),
+        .dma_wdata      (dma_m_wdata),
+        .dma_rdata      (dma_m_rdata),
+        .dma_burst_len  ({1'b0, dma_m_burst}),
+        .dma_write      (dma_m_write),
+        .dma_ready      (dma_m_ready),
+        .dma_error      (dma_m_error),
+        .haddr_o        (hm_addr_o),
+        .hwrite_o       (hm_write_o),
+        .hwdata_o       (hm_wdata_o),
+        .hsize_o        (hm_size_o),
+        .hburst_o       (hm_burst_o),
+        .hprot_o        (),
+        .htrans_o       (hm_trans_o),
+        .hrdata_i       (hm_rdata_i),
+        .hready_i       (hm_ready_i),
+        .hresp_i        (hm_resp_i)
     );
 
     //--------------------------------------------------------------------------
