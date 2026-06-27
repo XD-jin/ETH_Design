@@ -11,7 +11,7 @@ PROJ_ROOT = /home/chipmentor/project/GMAC
 RTL_DIR   = $(PROJ_ROOT)/rtl
 SIM_DIR   = $(PROJ_ROOT)/sim
 
-TOP = eth_mac_top
+TOP = tb_eth_mac_top
 TB  = tb_eth_mac_top
 
 #----------------------------------------------------------------------
