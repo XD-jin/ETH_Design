@@ -180,9 +180,7 @@ module reg_file #(
     //--------------------------------------------------------------------------
     generate
         if (P_SHELL_MODE) begin : gen_shell
-            // All config outputs tied to safe values in shell mode
-            // Register writes are ignored; reads return 0
-            assign reg_rd_data = 32'd0;
+            // Shell mode: writes ignored, outputs stay at reset defaults
         end else begin : gen_active
             always @(posedge hclk or negedge hresetn) begin
                 if (hresetn == 1'b0) begin
@@ -357,7 +355,7 @@ module reg_file #(
         endcase
     end
 
-    assign reg_rd_data = rd_data_reg;
+    assign reg_rd_data = P_SHELL_MODE ? 32'd0 : rd_data_reg;
 
     //--------------------------------------------------------------------------
     // Output assignments to sub-module config wires
