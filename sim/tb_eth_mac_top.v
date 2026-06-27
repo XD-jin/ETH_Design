@@ -291,27 +291,28 @@ module tb_eth_mac_top;
         output [ 7:0] frame_data [0:1535];
         output [15:0] frame_len;
         integer i;
+        integer j;
     begin
         i = 0;
         // DA[47:0]
-        frame_data[i] = da[47:40]; i++; frame_data[i] = da[39:32]; i++;
-        frame_data[i] = da[31:24]; i++; frame_data[i] = da[23:16]; i++;
-        frame_data[i] = da[15: 8]; i++; frame_data[i] = da[ 7: 0]; i++;
+        frame_data[i] = da[47:40]; i = i + 1; frame_data[i] = da[39:32]; i = i + 1;
+        frame_data[i] = da[31:24]; i = i + 1; frame_data[i] = da[23:16]; i = i + 1;
+        frame_data[i] = da[15: 8]; i = i + 1; frame_data[i] = da[ 7: 0]; i = i + 1;
         // SA[47:0]
-        frame_data[i] = sa[47:40]; i++; frame_data[i] = sa[39:32]; i++;
-        frame_data[i] = sa[31:24]; i++; frame_data[i] = sa[23:16]; i++;
-        frame_data[i] = sa[15: 8]; i++; frame_data[i] = sa[ 7: 0]; i++;
+        frame_data[i] = sa[47:40]; i = i + 1; frame_data[i] = sa[39:32]; i = i + 1;
+        frame_data[i] = sa[31:24]; i = i + 1; frame_data[i] = sa[23:16]; i = i + 1;
+        frame_data[i] = sa[15: 8]; i = i + 1; frame_data[i] = sa[ 7: 0]; i = i + 1;
         // EtherType
-        frame_data[i] = etype[15:8]; i++; frame_data[i] = etype[7:0]; i++;
+        frame_data[i] = etype[15:8]; i = i + 1; frame_data[i] = etype[7:0]; i = i + 1;
         // Payload
-        for (int j = 0; j < payload_len; j++) begin
+        for (j = 0; j < payload_len; j = j + 1) begin
             frame_data[i] = payload_data[j];
-            i++;
+            i = i + 1;
         end
         // PAD: minimum 46 bytes of data after DA+SA+EType (14 bytes)
         while (i < 60) begin
             frame_data[i] = 8'h00;
-            i++;
+            i = i + 1;
         end
         // CRC-32 will be appended by MAC hardware
         frame_len = i;  // without CRC
@@ -329,10 +330,10 @@ module tb_eth_mac_top;
     begin
         if (actual === expected) begin
             $display("  [PASS] %0s: 0x%08x", name, actual);
-            pass_cnt++;
+            pass_cnt = pass_cnt + 1;
         end else begin
             $display("  [FAIL] %0s: got 0x%08x, expected 0x%08x", name, actual, expected);
-            fail_cnt++;
+            fail_cnt = fail_cnt + 1;
         end
     end
     endtask
@@ -435,7 +436,7 @@ module tb_eth_mac_top;
         $display("[TB] --- Phase 2: Build Frame & DMA Setup ---");
 
         // 2.1 Build payload (simple incrementing pattern)
-        for (i = 0; i < 46; i++)
+        for (i = 0; i < 46; i = i + 1)
             payload[i] = i[7:0];
         $display("[TB] Payload: 46 bytes (0x00, 0x01, ..., 0x2D)");
 
