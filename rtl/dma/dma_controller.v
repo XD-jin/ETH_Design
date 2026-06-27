@@ -242,7 +242,7 @@ module dma_controller #(
             assign ahb_req    = 1'b0;
             assign ahb_addr   = 32'd0;
             assign ahb_wdata  = 32'd0;
-            assign ahb_burst  = 3.d0;
+            assign ahb_burst  = 3'd0;
             assign ahb_write  = 1'b0;
             assign ati_val    = 1'b0;
             assign ati_data   = 32'd0;
