@@ -91,3 +91,12 @@ source constraints.sdc
 compile_ultra
 report_area > area.rpt
 ```
+
+# EDA Tools DEBUG
+VCS和Verdi如果遇到没有license的情况，运行lm命令后重试
+
+##
+打开Verdi后，检查log文件./verdiLog/compiler.log, 如果有问题，修改后重新打开
+
+##
+运行VCS后也需要检查log文件，有问题修改，再重新跑

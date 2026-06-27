@@ -96,6 +96,7 @@ module eth_mac_top #(
     wire [31:0] reg_rd_data;
 
     // Register File → Sub-module configuration buses
+    wire [ 3:0] dma_intr_status_w;    wire [31:0] dma_ch0_status_int, dma_ch1_status_int;    wire rx_overflow_sts;    wire tx_frame_done, tx_underflow_sts, tx_jabber_sts;    wire rx_frame_done, rx_crc_error_sts, rx_recv_error_sts, rx_watchdog_error_sts;
     wire [31:0] cfg_mac_config;
     wire [31:0] cfg_mac_packet_filter;
     wire [13:0] cfg_mac_watchdog_limit;
@@ -251,13 +252,6 @@ module eth_mac_top #(
     );
 
     // Status wire tie-offs — replaced with actual sub-module connections below
-    wire tx_frame_done, tx_underflow_sts, tx_jabber_sts;
-    wire rx_frame_done, rx_crc_error_sts, rx_recv_error_sts, rx_watchdog_error_sts;
-    wire rx_overflow_sts;
-    wire [ 3:0] dma_intr_status_w;
-    wire [31:0] dma_ch0_status_int, dma_ch1_status_int;
-
-    //--------------------------------------------------------------------------
     // DMA Controller
     //--------------------------------------------------------------------------
     dma_controller #(.P_SHELL_MODE(P_SHELL_MODE))

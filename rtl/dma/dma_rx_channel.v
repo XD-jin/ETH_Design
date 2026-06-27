@@ -28,6 +28,7 @@ module dma_rx_channel #(
     output wire [31:0] ahb_wdata,
     output wire [ 3:0] ahb_burst,
     input  wire        ahb_ready,
+    input  wire [31:0] ahb_rdata,   // Read data from AHB
     input  wire        ahb_error,
 
     // ARI interface (from MTL)
@@ -180,7 +181,7 @@ module dma_rx_channel #(
                                 // RDES3[25] = BUF2V, RDES3[24] = BUF1V
                                 // Simplified: both valid
                                 buf2_valid <= 1'b1;
-                                buf2_addr  <= ahb_rdata + rx_buf_size;  // Simplified
+                                buf2_addr  <= ari_data + rx_buf_size;  // Simplified
                                 ioc_bit    <= 1'b0;  // Simplified
                             end
                         end
