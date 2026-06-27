@@ -398,256 +398,56 @@ agdc_clk_gate u_ckg_pipe0
 
 流片时在综合脚本中定义对应宏即可切换，功能 RTL 无需修改。
 
-#### SHELL_MODE 空壳模式
+#### SHELL_MODE 空壳模式（仅顶层）
 
-只有**顶层模块**需要 `P_SHELL_MODE` 参数。子模块通过顶层传参获得 shell 状态，不需要各自独立定义。
+`P_SHELL_MODE` **仅在顶层模块**存在。子模块完全不涉及 SHELL_MODE，只实现正常功能。
 
-##### 设计意图
+##### 实现方式
 
-- 系统仿真时，某些模块可能尚未准备好或不需要参与仿真
-- SHELL_MODE 将整个设计树变为空壳，所有输出接固定安全值，彻底隔离
-- 由顶层一处控制，避免每个子模块各自为政
-
-##### 实现规范
-
-1. **顶层参数声明**：仅在顶层模块声明 `parameter P_SHELL_MODE = 0`
-2. **顶层传递**：顶层将 `P_SHELL_MODE` 值通过例化端口传递给每个子模块
-3. **子模块接收**：子模块接收 shell 状态作为 parameter（默认值跟随顶层），使用 `generate if/else` 隔离逻辑
-4. **输出信号 tie-off 规则**（空壳分支内）：
-   - **握手 ready 信号**：接 `1'b1`，表示本模块始终准备好接收
-   - **握手 valid 信号**：接 `1'b0`，表示本模块无有效数据产出
-   - **数据信号**（`data`/`addr`/`len` 等）：接 `'0`
-   - **中断/错误信号**：接 `1'b0`
-   - **状态信号**：接空闲状态值
-5. **子模块例化**：空壳分支内不例化任何子模块，纯 wire 赋值
-
-##### 简化示例
+顶层用 `generate if/else`：`P_SHELL_MODE=1` 时不例化子模块，直接 tie-off 输出。
 
 ```verilog
-// === 顶层: 唯一声明 P_SHELL_MODE 的地方 ===
 module eth_mac_top #(
     parameter P_SHELL_MODE = 0
 ) (
-    ...
-);
-    // 传递给子模块
-    mac_tx #(.P_SHELL_MODE(P_SHELL_MODE)) u_mac_tx (...);
-    mac_rx #(.P_SHELL_MODE(P_SHELL_MODE)) u_mac_rx (...);
-    ...
-endmodule
-
-// === 子模块: 不声明 P_SHELL_MODE，只接收 ===
-module mac_tx #(
-    parameter P_SHELL_MODE = 0   // 从顶层继承，不独立
-) (
-    ...
-);
-    generate
-        if (P_SHELL_MODE) begin : gen_shell
-            assign gmii_txd   = 8'd0;
-            assign gmii_tx_en = 1'b0;
-            ...
-        end else begin : gen_active
-            // normal logic
-        end
-    endgenerate
-endmodule
-```
-
-##### 代码模板
-
-```verilog
-// === 顶层: 唯一的 SHELL_MODE 声明和传递点 ===
-module eth_mac_top #(
-    parameter P_SHELL_MODE  = 0
-) (
     input  wire        hclk,
     input  wire        hresetn,
-    input  wire [31:0] hwdata,
-    output wire [31:0] hrdata
-);
-
-    // 传递给所有子模块
-    sub_module_a #(.P_SHELL_MODE(P_SHELL_MODE)) u_a (
-        .clk   (hclk),
-        .rst_n (hresetn),
-        .in    (hwdata),
-        .out   (hrdata)
-    );
-
-endmodule
-
-// === 子模块: 接收 P_SHELL_MODE，不独立声明 ===
-module sub_module_a #(
-    parameter P_DATA_WIDTH = 32,
-    parameter P_SHELL_MODE = 0     // 从顶层传入，非独立定义
-) (
-    input  wire                     clk,
-    input  wire                     rst_n,
-    input  wire [P_DATA_WIDTH-1:0]  in,
-    output reg  [P_DATA_WIDTH-1:0]  out
+    output wire [31:0] hrdata,
+    output wire        hready,
+    output wire [3:0]  rgmii_txd
 );
 
     generate
         if (P_SHELL_MODE) begin : gen_shell
-            assign out = {P_DATA_WIDTH{1'b0}};
+            assign hrdata    = 32'd0;
+            assign hready    = 1'b1;
+            assign rgmii_txd = 4'd0;
         end else begin : gen_active
-            always @(posedge clk or negedge rst_n) begin
-                if (!rst_n)
-                    out <= {P_DATA_WIDTH{1'b0}};
-                else
-                    out <= in;
-            end
+            ahb_slave_if u_ahb (...);
+            mac_tx       u_mac_tx (...);
         end
     endgenerate
-
 endmodule
-##### 信号 tie-off 速查表
 
-| 信号类型 | 方向 | SHELL_MODE 值 | 说明 |
-|----------|------|---------------|------|
-| `*ready` / `*rdy` | output | `1'b1` | 表示始终可接收，不阻塞上游 |
-| `*valid` / `*vld` | output | `1'b0` | 表示无有效数据，下游不采样 |
-| `*data` / `*addr` / `*len` / `*size` | output | `'0` | 数据总线接全零 |
-| `*interrupt` / `*error` / `*err` | output | `1'b0` | 不触发中断/错误 |
-| `*last` / `*end` | output | `1'b0` | 非最后一拍 |
-| `*keep` / `*strobe` | output | `'0` | 字节使能全零 |
-| `*id` / `*user` | output | `'0` | 侧带信号全零 |
-| 总线主接口（如 AXI/AHB master） | output | 所有 output 按上述规则 tie-off | 等同于 master 空闲 |
-| 寄存器配置输出（cfg_*） | output | `'0` | 配置值全零（默认值） |
-
-> **注意**：特定模块可能有例外——如某些 ready 信号在 SHELL_MODE 下应接 `1'b0` 以阻断上游数据流。请在模块规格中明确说明例外情况。
-
-##### 顶层集成建议
-
-顶层是系统中唯一声明 `P_SHELL_MODE` 的地方。通过参数传递给所有子模块：
-
-```verilog
-// 顶层
-module eth_mac_top #(
-    parameter P_SHELL_MODE = 0       // 唯一定义点
+// 子模块: 无 P_SHELL_MODE, 纯正常逻辑
+module mac_tx #(
+    parameter P_DATA_WIDTH = 32
 ) (
-    ...
+    input  wire clk, rst_n, ...
 );
-    // 传递给所有子模块
-    mac_tx  #(.P_SHELL_MODE(P_SHELL_MODE)) u_mac_tx (...);
-    mac_rx  #(.P_SHELL_MODE(P_SHELL_MODE)) u_mac_rx (...);
-    crc32   #(.P_SHELL_MODE(P_SHELL_MODE)) u_crc32  (...);
-    ...
-endmodule
-```
-
-仿真时通过 `+define+ETH_SHELL_MODE` 或直接修改顶层 parameter 值一键切换全系统空壳。按模块粒度单独控制时，只改对应模块的参数值即可。
-
-#### 时序与 STA
-
-- 避免组合逻辑反馈环
-- 采用同步设计方法
-- 简化寄存器时钟来源
-- 避免 multicycle path 和 false path
-- 避免时钟作为数据
-- 禁止使用 latch（M2 强制）
-- 异步逻辑独立成单独模块
-- IP 接口输出必须寄存（M2 强制）
-- IP 接口寄存器同一时钟单沿触发
-- IP 必须是同步设计（M2 强制）
-- 时钟方案必须文档化（M1 强制）
-- 避免手工时钟门控，使用综合工具插入
-- IP 必须可复位，复位策略必须文档化（M1 强制）
-- 避免工艺相关单元
-
-#### DFT（可测性设计）
-
-- 禁止三态器件（M1 强制）
-- 禁止双向 net
-- 禁止在设计中用 latch
-- 禁止使用时钟双沿
-- 禁止门控时钟
-- 禁止内部生成的时钟
-- 禁止内部生成的 set/reset 信号
-- 禁止用时钟和 set/reset 信号作为数据
-- 避免组合环
-- 避免常量输入或浮空输出
-- 避免时钟或 set/reset 信号直接输出
-- 避免时钟作为 set/reset 信号
-- 避免异步路径环路
-
-#### 仿真
-
-- **时序 always 块用非阻塞赋值 `<=`**（M1 强制）
-- **组合 always 块用阻塞赋值 `=`**（M1 强制）
-- 组合 always 块敏感列表必须完整（M1 强制）
-- 避免冗余敏感列表
-- 初始化控制存储单元
-- 禁止赋 X 值（`don't care`）（M1 强制）
-- 避免使用 delay 赋值
-
-## 示例
-
-**输入 JSON**：
-
-```json
-{
-  "modules": [{
-    "name": "accumulator",
-    "ports": [
-      {"name": "clk", "direction": "input", "width": 1, "type": "clock"},
-      {"name": "rst_n", "direction": "input", "width": 1, "type": "reset"},
-      {"name": "data_in", "direction": "input", "width": 32},
-      {"name": "data_valid", "direction": "input", "width": 1},
-      {"name": "result", "direction": "output", "width": 32}
-    ],
-    "description": "累加器，每个valid周期累加输入数据"
-  }]
-}
-```
-
-**输出 Verilog**：
-
-```verilog
-// ============================================================================
-// Module: accumulator
-// Description: 累加器，每个valid周期累加输入数据
-// ============================================================================
-
-module accumulator #(
-  parameter DATA_WIDTH = 32
-) (
-  input  wire                    clk,
-  input  wire                    rst_n,
-  input  wire [DATA_WIDTH-1:0]   data_in,
-  input  wire                    data_valid,
-  output reg  [DATA_WIDTH-1:0]   result
-);
-
-  //--------------------------------------------------------------------------
-  // Internal Signals
-  //--------------------------------------------------------------------------
-  reg [DATA_WIDTH-1:0] acc_reg;
-
-  //--------------------------------------------------------------------------
-  // Accumulator Logic
-  //--------------------------------------------------------------------------
-  always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-      acc_reg <= {DATA_WIDTH{1'b0}};
-      result  <= {DATA_WIDTH{1'b0}};
-    end else begin
-      if (data_valid) begin
-        acc_reg <= acc_reg + data_in;
-      end
-      result <= acc_reg;
+    always @(posedge clk or negedge rst_n) begin
+        // 正常功能
     end
-  end
-
 endmodule
 ```
 
-## 可选配置
+##### 信号 tie-off 速查表（顶层 gen_shell 内）
 
-用户可指定：
+| 信号类型 | tie-off 值 | 说明 |
+|----------|-----------|------|
+| `*ready` / `*rdy` (output) | `1'b1` | 始终可接收 |
+| `*valid` / `*vld` (output) | `1'b0` | 无有效数据 |
+| `*data` / `*addr` (output) | `'0` | 总线全零 |
+| `*interrupt` / `*error` (output) | `1'b0` | 不触发 |
+| 总线 master (AHB/AXI) | 按上述规则 | 等同于空闲 master |
 
-- 代码风格：Verilog / SystemVerilog
-- 复位策略：异步低有效 / 同步高有效 / 无复位
-- 是否生成 testbench 骨架
-- 是否生成接口封装（AXI/AHB/APB）

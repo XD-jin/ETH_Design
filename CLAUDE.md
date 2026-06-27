@@ -74,7 +74,7 @@ Empty `.port()` for unused outputs — never declare `_nc` signals.
 
 ### SHELL_MODE
 
-Every module MUST have `parameter P_SHELL_MODE = 0`. When `1`, outputs tie to safe values: `*ready=1'b1`, `*valid=1'b0`, data buses = `'0`, interrupts = `1'b0`. Use `+define+ETH_SHELL_MODE` for fast system-level simulation with incomplete submodules.
+Only the **top-level module** has `parameter P_SHELL_MODE = 0`. When `1`, the top does not instantiate any sub-modules — it ties its own outputs directly to safe values (`*ready=1'b1`, `*valid=1'b0`, data=`'0`). Sub-modules have no SHELL_MODE; they implement normal functionality only.
 
 ### FSM: Three-process, parameter-encoded states
 ```verilog
