@@ -79,6 +79,18 @@ triggers:
 | 过程赋值信号声明为 reg | `always` 块内赋值的信号必须声明为 `reg`，禁止 `wire`（Verilog 语法要求，`wire` 只能用于 `assign` 连续赋值） | Error |
 | 信号集中声明 | 内部 wire 集中在一个区域 | Info |
 | 端口无内联表达式 | 端口连接中避免 glue logic | Warning |
+| 例化端口位宽匹配 | 实例化时连接双方端口位宽必须一致（如 `[3:0]`→`[3:0]`）。特例：显式截断需注释说明 | Error |
+| 参数化位宽一致性 | 同一 parameter 值在两端的位宽推导必须一致（如 `P_DATA_WIDTH=32`→例化端口32-bit，但连接信号为8-bit） | Error |
+| 悬空输出端口 | 未连接的 output 端口在综合后可能被优化，需用 `.port()` 显式留空 | Warning |
+
+**位宽不匹配常见模式**：
+
+| 模式 | VCS Warning | 示例 | 修复 |
+|------|-----------|------|------|
+| port 定义偏大 | PCWM: N-bit → M-bit port | `wire [3:0] intr;` → port `input [31:0] cfg_intr` | port 改为 `[3:0]` |
+| 协议端口超宽 | PCWM: 3-bit → 4-bit | `wire [2:0] hburst;` → port `output [3:0] ahb_burst` | AMBA HBURST=3-bit, port 改为 `[2:0]` |
+| 参数化 FIFO 不匹配 | PCWM: 8-bit → 32-bit | `wire [7:0] rd;` → `async_fifo #(.W(32))` 的 rd_data | 信号改为 `[31:0]`，使用时取 `[7:0]` |
+| 未连接端口 | TFIPC | 例化时缺少端口连接 | 补充 `.port_name(signal)` |
 
 ### 4. 可综合性
 
