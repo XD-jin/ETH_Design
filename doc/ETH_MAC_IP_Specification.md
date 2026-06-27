@@ -18,14 +18,35 @@ ETH_MAC 是一个全双工千兆以太网 MAC 控制器 IP，提供从 AHB 系�
 | 线速率 | 1000 Mbps (仅全双工) |
 | PHY 接口 | RGMII v2.6, 4-bit DDR @ 125 MHz |
 | 主机接口 | AHB Master (DMA) + AHB Slave (CSR) |
-| AHB 数据宽度 | 32-bit (可配置 64-bit) |
+| AHB 数据宽度 | 32-bit |
 | DMA 通道 | 2 Tx Channels + 2 Rx Channels |
 | 描述符格式 | 16-Byte Ring Descriptor |
 | 流控 | IEEE 802.3x Pause Frame (全双工) |
-| 帧长 | 64 ~ 1518 Bytes (标准) / 最大 9018 Bytes (Jumbo, 可配置) |
+| 帧长 | 64 ~ 1518 Bytes (标准) |
 | 地址过滤 | Perfect Match (4 entries) + 64-bit Hash Filter |
-| 目标频率 | hclk ≥ 100 MHz, gmii_clk = 125 MHz |
-| 工艺 | ASIC / FPGA 通用 (纯同步设计) |
+| 时钟域 | hclk (AHB) + gmii_tx_clk (125MHz PLL) + gmii_rx_clk (125MHz PHY) |
+
+### 1.2b V1.0 Scope — 明确边界
+
+| 功能 | V1.0 状态 | 说明 |
+|------|:---------:|------|
+| 基础 MAC Frame TX/RX | ✅ 完整 | CRC-32, PAD, Preamble, IFG |
+| 地址过滤 (Perfect + Hash) | ✅ 完整 | 4 精确匹配 entries, 64-bit hash |
+| IEEE 802.3x Flow Control | ✅ 完整 | Pause 帧自动收发 |
+| 2-Channel DMA (TX+RX) | ✅ 完整 | 4 通道全部连通, 环描述符 |
+| MTL 队列管理 | ✅ 完整 | 异步 FIFO, SP/WRR 调度 |
+| gmii_tx_clk 独立时钟 | ✅ 完整 | 顶层端口, 与 hclk 完全异步 |
+| P_SHELL_MODE | ✅ 完整 | 所有 20 模块 |
+| Jumbo Frame (JE) | ❌ 不实现 | V1.0 最大 1518B |
+| VLAN (802.1Q) | ❌ 不实现 | 无 Tag 插入/剥离/过滤 |
+| Checksum Offload | ❌ 不实现 | 无 IP/TCP/UDP checksum |
+| IEEE 1588 / PTP | ❌ 不实现 | 无时间戳 |
+| EEE (802.3az) | ❌ 不实现 | 无低功耗 idle |
+| TSN (802.1Qbv/Qbu) | ❌ 不实现 | 无 EST/FPE |
+| MDIO Master | ❌ 不实现 | `mdio_clk` 未连接 |
+| RMON/MIB Counters | ❌ 不实现 | 无统计计数器 |
+| Register File (reg_file.v) | ❌ 待实现 | 46 个寄存器待 RTL 化 |
+| RGMII DDR 原语 | ❌ 待 FPGA | IDDR/ODDR 由综合工具推断 |
 
 ### 1.3 顶层接口信号
 
@@ -702,98 +723,109 @@ endmodule
 
 ## 5. Register Map
 
-寄存器地址空间划分为四个 Block，参考 DWC_ether_qos 层级布局：
+V1.0 实现 46 个核心寄存器。以下无 V1.0 标记的寄存器为预留（后续版本实现）。
 
 ```
-  Offset       Block
-  ─────────────────────
-  0x0000       MAC     (Media Access Controller)
-  0x0C00       MTL     (MAC Transaction Layer - FIFO / Queue)
-  0x1000       DMA     (DMA Engine Common)
-  0x1100       DMA_CH  (DMA Channel 0~1)
+  Offset       Block          V1.0 寄存器数
+  ───────────────────────────────────────
+  0x0000       MAC            12 (核心) + 8 (地址)
+  0x0C00       MTL            12
+  0x1000       DMA            6
+  0x1100       DMA_CH         8 / channel × 2 = 16
+  Total V1.0                   46
 ```
 
 ### 5.1 寄存器总览
 
-| Offset | 缩写 | 名称 | 复位值 |
-|--------|------|------|--------|
-| **EQOS_MAC Block (0x0000 ~ 0x03FF)** |
-| 0x0000 | MAC_Configuration | MAC Configuration | 0x0000_0000 |
-| 0x0004 | MAC_Ext_Configuration | MAC Extended Configuration | 0x0000_0000 |
-| 0x0008 | MAC_Packet_Filter | MAC Packet Filter Control | 0x0000_0000 |
-| 0x000C | MAC_Watchdog_Timeout | MAC Watchdog Timeout | 0x0000_0000 |
-| 0x0010 | MAC_Hash_Table_Reg0 | Hash Table Bits [31:0] | 0x0000_0000 |
-| 0x0014 | MAC_Hash_Table_Reg1 | Hash Table Bits [63:32] | 0x0000_0000 |
-| 0x0070 | MAC_Q0_Tx_Flow_Ctrl | Queue 0 Tx Flow Control | 0x0000_0000 |
-| 0x0074 | MAC_Q1_Tx_Flow_Ctrl | Queue 1 Tx Flow Control | 0x0000_0000 |
-| 0x0090 | MAC_Rx_Flow_Ctrl | Rx Flow Control | 0x0000_0000 |
-| 0x00B0 | MAC_Interrupt_Status | MAC Interrupt Status (RC/W1C) | 0x0000_0000 |
-| 0x00B4 | MAC_Interrupt_Enable | MAC Interrupt Enable | 0x0000_0000 |
-| 0x00B8 | MAC_Rx_Tx_Status | MAC Rx/Tx Error Status | 0x0000_0000 |
-| 0x0110 | MAC_Version | MAC Version (RO) | 0x0000_0100 |
-| 0x011C | MAC_HW_Feature0 | MAC HW Feature 0 (RO) | 配置相关 |
-| 0x0120 | MAC_HW_Feature1 | MAC HW Feature 1 (RO) | 配置相关 |
-| 0x0300 | MAC_Address0_High | MAC Address 0 High [47:32] | 0x0000_0000 |
-| 0x0304 | MAC_Address0_Low | MAC Address 0 Low [31:0] | 0x0000_0000 |
-| 0x0308 | MAC_Address1_High | MAC Address 1 High | 0x0000_0000 |
-| 0x030C | MAC_Address1_Low | MAC Address 1 Low | 0x0000_0000 |
-| 0x0310 | MAC_Address2_High | MAC Address 2 High | 0x0000_0000 |
-| 0x0314 | MAC_Address2_Low | MAC Address 2 Low | 0x0000_0000 |
-| 0x0318 | MAC_Address3_High | MAC Address 3 High | 0x0000_0000 |
-| 0x031C | MAC_Address3_Low | MAC Address 3 Low | 0x0000_0000 |
+| Offset | 缩写 | 名称 | 复位值 | V1.0 |
+|--------|------|------|--------|:----:|
+| **EQOS_MAC Block — Core (0x0000 ~ 0x00FF)** |
+| 0x0000 | MAC_Configuration | MAC Configuration | 0x0000_0000 | ✅ |
+| 0x0008 | MAC_Packet_Filter | MAC Packet Filter Control | 0x0000_0000 | ✅ |
+| 0x000C | MAC_Watchdog_Timeout | MAC Watchdog Timeout | 0x0000_0000 | ✅ |
+| 0x0010 | MAC_Hash_Table_Reg0 | Hash Table Bits [31:0] | 0x0000_0000 | ✅ |
+| 0x0014 | MAC_Hash_Table_Reg1 | Hash Table Bits [63:32] | 0x0000_0000 | ✅ |
+| 0x0070 | MAC_Q0_Tx_Flow_Ctrl | Queue 0 Tx Flow Control | 0x0000_0000 | ✅ |
+| 0x0074 | MAC_Q1_Tx_Flow_Ctrl | Queue 1 Tx Flow Control | 0x0000_0000 | ✅ |
+| 0x0090 | MAC_Rx_Flow_Ctrl | Rx Flow Control | 0x0000_0000 | ✅ |
+| 0x00B0 | MAC_Interrupt_Status | MAC Interrupt Status (RC/W1C) | 0x0000_0000 | ✅ |
+| 0x00B4 | MAC_Interrupt_Enable | MAC Interrupt Enable | 0x0000_0000 | ✅ |
+| 0x00B8 | MAC_Rx_Tx_Status | MAC Rx/Tx Error Status | 0x0000_0000 | ✅ |
+| 0x0110 | MAC_Version | MAC Version (RO) | 0x0000_0100 | ✅ |
+| **EQOS_MAC Block — Addresses (0x0300 ~ 0x033F)** |
+| 0x0300 | MAC_Address0_High | MAC Address 0 High [47:32] | 0x0000_0000 | ✅ |
+| 0x0304 | MAC_Address0_Low | MAC Address 0 Low [31:0] | 0x0000_0000 | ✅ |
+| 0x0308 | MAC_Address1_High | MAC Address 1 High | 0x0000_0000 | ✅ |
+| 0x030C | MAC_Address1_Low | MAC Address 1 Low | 0x0000_0000 | ✅ |
+| 0x0310 | MAC_Address2_High | MAC Address 2 High | 0x0000_0000 | ✅ |
+| 0x0314 | MAC_Address2_Low | MAC Address 2 Low | 0x0000_0000 | ✅ |
+| 0x0318 | MAC_Address3_High | MAC Address 3 High | 0x0000_0000 | ✅ |
+| 0x031C | MAC_Address3_Low | MAC Address 3 Low | 0x0000_0000 | ✅ |
 | **EQOS_MTL Block (0x0C00 ~ 0x0CFF)** |
-| 0x0C00 | MTL_Operation_Mode | MTL Operation Mode | 0x0000_0000 |
-| 0x0C20 | MTL_Interrupt_Status | MTL Interrupt Status | 0x0000_0000 |
-| 0x0C30 | MTL_RxQ_DMA_Map0 | Rx Queue to DMA Channel Mapping 0 | 0x0000_0000 |
-| 0x0D00 | MTL_TxQ0_Operation_Mode | Tx Queue 0 Operation Mode | 0x0000_0000 |
-| 0x0D04 | MTL_TxQ0_Underflow | Tx Queue 0 Underflow Count | 0x0000_0000 |
-| 0x0D08 | MTL_TxQ0_Debug | Tx Queue 0 Debug | 0x0000_0000 |
-| 0x0D30 | MTL_RxQ0_Operation_Mode | Rx Queue 0 Operation Mode | 0x0000_0000 |
-| 0x0D34 | MTL_RxQ0_Missed_Pkt | Rx Queue 0 Missed Packet/Overflow | 0x0000_0000 |
-| 0x0D40 | MTL_TxQ1_Operation_Mode | Tx Queue 1 Operation Mode | 0x0000_0000 |
-| 0x0D44 | MTL_TxQ1_Underflow | Tx Queue 1 Underflow Count | 0x0000_0000 |
-| 0x0D70 | MTL_RxQ1_Operation_Mode | Rx Queue 1 Operation Mode | 0x0000_0000 |
-| 0x0D74 | MTL_RxQ1_Missed_Pkt | Rx Queue 1 Missed Packet/Overflow | 0x0000_0000 |
+| 0x0C00 | MTL_Operation_Mode | MTL Operation Mode | 0x0000_0000 | ✅ |
+| 0x0C20 | MTL_Interrupt_Status | MTL Interrupt Status | 0x0000_0000 | ✅ |
+| 0x0C30 | MTL_RxQ_DMA_Map0 | Rx Queue to DMA Channel Mapping 0 | 0x0000_0000 | ✅ |
+| 0x0D00 | MTL_TxQ0_Operation_Mode | Tx Queue 0 Operation Mode | 0x0000_0000 | ✅ |
+| 0x0D04 | MTL_TxQ0_Underflow | Tx Queue 0 Underflow Count | 0x0000_0000 | ✅ |
+| 0x0D30 | MTL_RxQ0_Operation_Mode | Rx Queue 0 Operation Mode | 0x0000_0000 | ✅ |
+| 0x0D34 | MTL_RxQ0_Missed_Pkt | Rx Queue 0 Missed Packet/Overflow | 0x0000_0000 | ✅ |
+| 0x0D40 | MTL_TxQ1_Operation_Mode | Tx Queue 1 Operation Mode | 0x0000_0000 | ✅ |
+| 0x0D44 | MTL_TxQ1_Underflow | Tx Queue 1 Underflow Count | 0x0000_0000 | ✅ |
+| 0x0D70 | MTL_RxQ1_Operation_Mode | Rx Queue 1 Operation Mode | 0x0000_0000 | ✅ |
+| 0x0D74 | MTL_RxQ1_Missed_Pkt | Rx Queue 1 Missed Packet/Overflow | 0x0000_0000 | ✅ |
 | **EQOS_DMA Block (0x1000 ~ 0x10FF)** |
-| 0x1000 | DMA_Mode | DMA Mode | 0x0000_0000 |
-| 0x1004 | DMA_SysBus_Mode | DMA System Bus Mode | 0x0100_0000 |
-| 0x1008 | DMA_Interrupt_Status | DMA Interrupt Status (RC/W1C) | 0x0000_0000 |
-| 0x100C | DMA_Interrupt_Enable | DMA Interrupt Enable | 0x0000_0000 |
-| 0x1014 | DMA_Tx_Intr_Timer | Tx Interrupt Coalescing Timer | 0x0000_0000 |
-| 0x1018 | DMA_Rx_Intr_Timer | Rx Interrupt Coalescing Timer | 0x0000_0000 |
+| 0x1000 | DMA_Mode | DMA Mode | 0x0000_0000 | ✅ |
+| 0x1004 | DMA_SysBus_Mode | DMA System Bus Mode | 0x0100_0000 | ✅ |
+| 0x1008 | DMA_Interrupt_Status | DMA Interrupt Status (RC/W1C) | 0x0000_0000 | ✅ |
+| 0x100C | DMA_Interrupt_Enable | DMA Interrupt Enable | 0x0000_0000 | ✅ |
+| 0x1014 | DMA_Tx_Intr_Timer | Tx Interrupt Coalescing Timer | 0x0000_0000 | ✅ |
+| 0x1018 | DMA_Rx_Intr_Timer | Rx Interrupt Coalescing Timer | 0x0000_0000 | ✅ |
 | **EQOS_DMA_CH0 Block (0x1100 ~ 0x117F)** |
-| 0x1100 | DMA_CH0_Control | Channel 0 Control | 0x0000_0000 |
-| 0x1104 | DMA_CH0_Tx_Control | Channel 0 Tx Control | 0x0000_0000 |
-| 0x1108 | DMA_CH0_Rx_Control | Channel 0 Rx Control | 0x0000_0000 |
-| 0x1110 | DMA_CH0_TxDesc_List_HAddr | Channel 0 Tx Desc List High Addr | 0x0000_0000 |
-| 0x1114 | DMA_CH0_TxDesc_List_Addr | Channel 0 Tx Desc List Address | 0x0000_0000 |
-| 0x1118 | DMA_CH0_RxDesc_List_HAddr | Channel 0 Rx Desc List High Addr | 0x0000_0000 |
-| 0x111C | DMA_CH0_RxDesc_List_Addr | Channel 0 Rx Desc List Address | 0x0000_0000 |
-| 0x1120 | DMA_CH0_TxDesc_Ring_Length | Channel 0 Tx Desc Ring Length | 0x0000_0000 |
-| 0x1124 | DMA_CH0_RxDesc_Ring_Length | Channel 0 Rx Desc Ring Length | 0x0000_0000 |
-| 0x1128 | DMA_CH0_TxDesc_Tail_Pointer | Channel 0 Tx Tail Pointer | 0x0000_0000 |
-| 0x112C | DMA_CH0_RxDesc_Tail_Pointer | Channel 0 Rx Tail Pointer | 0x0000_0000 |
-| 0x1138 | DMA_CH0_Current_App_TxDesc | Channel 0 Current App Tx Desc (RO) | 0x0000_0000 |
-| 0x113C | DMA_CH0_Current_App_RxDesc | Channel 0 Current App Rx Desc (RO) | 0x0000_0000 |
-| 0x1144 | DMA_CH0_Status | Channel 0 Status (RC) | 0x0000_0000 |
+| 0x1100 | DMA_CH0_Control | Channel 0 Control | 0x0000_0000 | ✅ |
+| 0x1104 | DMA_CH0_Tx_Control | Channel 0 Tx Control | 0x0000_0000 | ✅ |
+| 0x1108 | DMA_CH0_Rx_Control | Channel 0 Rx Control | 0x0000_0000 | ✅ |
+| 0x1114 | DMA_CH0_TxDesc_List_Addr | Channel 0 Tx Desc List Address | 0x0000_0000 | ✅ |
+| 0x111C | DMA_CH0_RxDesc_List_Addr | Channel 0 Rx Desc List Address | 0x0000_0000 | ✅ |
+| 0x1128 | DMA_CH0_TxDesc_Tail_Pointer | Channel 0 Tx Tail Pointer | 0x0000_0000 | ✅ |
+| 0x112C | DMA_CH0_RxDesc_Tail_Pointer | Channel 0 Rx Tail Pointer | 0x0000_0000 | ✅ |
+| 0x1144 | DMA_CH0_Status | Channel 0 Status (RC) | 0x0000_0000 | ✅ |
 | **EQOS_DMA_CH1 Block (0x1180 ~ 0x11FF)** |
-| 0x1180 | DMA_CH1_Control | Channel 1 Control | 0x0000_0000 |
-| 0x1184 | DMA_CH1_Tx_Control | Channel 1 Tx Control | 0x0000_0000 |
-| 0x1188 | DMA_CH1_Rx_Control | Channel 1 Rx Control | 0x0000_0000 |
-| 0x1190 | DMA_CH1_TxDesc_List_HAddr | Channel 1 Tx Desc List High Addr | 0x0000_0000 |
-| 0x1194 | DMA_CH1_TxDesc_List_Addr | Channel 1 Tx Desc List Address | 0x0000_0000 |
-| 0x1198 | DMA_CH1_RxDesc_List_HAddr | Channel 1 Rx Desc List High Addr | 0x0000_0000 |
-| 0x119C | DMA_CH1_RxDesc_List_Addr | Channel 1 Rx Desc List Address | 0x0000_0000 |
-| 0x11A0 | DMA_CH1_TxDesc_Ring_Length | Channel 1 Tx Desc Ring Length | 0x0000_0000 |
-| 0x11A4 | DMA_CH1_RxDesc_Ring_Length | Channel 1 Rx Desc Ring Length | 0x0000_0000 |
-| 0x11A8 | DMA_CH1_TxDesc_Tail_Pointer | Channel 1 Tx Tail Pointer | 0x0000_0000 |
-| 0x11AC | DMA_CH1_RxDesc_Tail_Pointer | Channel 1 Rx Tail Pointer | 0x0000_0000 |
-| 0x11B8 | DMA_CH1_Current_App_TxDesc | Channel 1 Current App Tx Desc (RO) | 0x0000_0000 |
-| 0x11BC | DMA_CH1_Current_App_RxDesc | Channel 1 Current App Rx Desc (RO) | 0x0000_0000 |
-| 0x11C4 | DMA_CH1_Status | Channel 1 Status (RC) | 0x0000_0000 |
+| 0x1180 | DMA_CH1_Control | Channel 1 Control | 0x0000_0000 | ✅ |
+| 0x1184 | DMA_CH1_Tx_Control | Channel 1 Tx Control | 0x0000_0000 | ✅ |
+| 0x1188 | DMA_CH1_Rx_Control | Channel 1 Rx Control | 0x0000_0000 | ✅ |
+| 0x1194 | DMA_CH1_TxDesc_List_Addr | Channel 1 Tx Desc List Address | 0x0000_0000 | ✅ |
+| 0x119C | DMA_CH1_RxDesc_List_Addr | Channel 1 Rx Desc List Address | 0x0000_0000 | ✅ |
+| 0x11A8 | DMA_CH1_TxDesc_Tail_Pointer | Channel 1 Tx Tail Pointer | 0x0000_0000 | ✅ |
+| 0x11AC | DMA_CH1_RxDesc_Tail_Pointer | Channel 1 Rx Tail Pointer | 0x0000_0000 | ✅ |
+| 0x11C4 | DMA_CH1_Status | Channel 1 Status (RC) | 0x0000_0000 | ✅ |
+
+### 5.1b V1.0 不实现：已移除的 DWC_ether_qos 寄存器
+
+以下寄存器在 DWC_ether_qos databook 中存在，但本 IP V1.0 **明确不实现**（功能不在 V1.0 范围内）：
+
+| 不实现的寄存器类别 | 原因 |
+|-------------------|------|
+| `MAC_Ext_Configuration` (0x0004) | EEE/GPSL/SAF/VLAN 扩展控制 — 无 EEE/VLAN |
+| `MAC_VLAN_Tag*`, `MAC_VLAN_Incl`, `MAC_Inner_VLAN_Incl` | VLAN Tag 插入/过滤 — V1.0 无 VLAN |
+| `MAC_PMT_Control_Status`, `MAC_RWK_Packet_Filter` | 电源管理/远程唤醒 — V1.0 无 PMT |
+| `MAC_LPI_*` (0x00D0~0x00DC) | Energy Efficient Ethernet — V1.0 无 EEE |
+| `MAC_AN_*` (0x00E0~0x00F4) | Auto-Negotiation — 由外部 PHY 通过 MDIO 管理 |
+| `MAC_MDIO_Address/Data` (0x0200~0x0204) | MDIO Master — V1.0 无 MDIO |
+| `MAC_ARP_Address` (0x0210) | ARP Offload — V1.0 无 ARP 卸载 |
+| `MAC_HW_Feature*` (0x011C~0x0128) | 硬件特性寄存器 — 可选, V1.0 不实现 |
+| `MAC_FPE_CTRL_STS` (0x0234) | Frame Preemption — V1.0 无 FPE (802.3br) |
+| `MMC_*` (0x0700~0x0808) | RMON/MIB 计数器 — V1.0 不实现 |
+| `MTL_DBG_*` (0x0C08~0x0C10) | FIFO Debug 访问 — V1.0 不实现 |
+| `MTL_EST_*`, `MTL_TBS_*` | TSN 调度 — V1.0 无 TSN |
+| `MTL_TxQ*_Debug` (0x0D08) | Queue Debug — V1.0 不实现 |
+| `DMA_CH*_TxDesc_List_HAddr` | High Address (32-bit addr only) — V1.0 仅 32-bit 地址 |
+| `DMA_CH*_RxDesc_List_HAddr` | 同上 |
+| `DMA_CH*_Current_App_*Desc` | Current Descriptor Pointer (RO) — 可选, V1.0 不实现 |
+| `DMA_CH*_TxDesc_Ring_Length` | 环长度可配置 — V1.0 固定 64 entries, 用 parameter |
+| `DMA_CH*_RxDesc_Ring_Length` | 同上 |
 
 > **地址模式**: MAC 地址寄存器 `0x0300 + n*8` (n=0~3), DMA 通道寄存器 `0x1100 + ch*0x80 + reg_offset`。
-> **读写属性**: RO=Read Only, RW=Read/Write, RC=Read Clear, W1C=Write 1 Clear, Wo=Write Once.
+> **读写属性**: RO=Read Only, RW=Read/Write, RC=Read Clear, W1C=Write 1 Clear.
 
 ### 5.2 MAC_Configuration (0x0000)
 

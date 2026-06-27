@@ -39,7 +39,6 @@ triggers:
 | 端口注释 | 每个端口有行内注释 | Info |
 | 关键逻辑注释 | 复杂逻辑、状态机、跨域处理有注释 | Info |
 | 注释使用英文 | 所有注释必须使用英文，简洁易懂 | Warning |
-| 模块规模 | 单模块不超过 500 行 | Warning |
 
 ### 2. 命名规范
 
@@ -98,6 +97,7 @@ triggers:
 | 未用输入驱动 | 未用的 module 输入必须驱动 | Warning |
 | 未用输出留空连接 | 未用的 module 输出留空连接 `.port()`，禁止声明 `_nc`/`_unused` 信号 | Info |
 | 避免顶层 glue logic | 顶层模块只做实例化 | Warning |
+| latch 存在|尽量不使用 latch，若必须使用，需在评审报告中说明 | Warning |
 
 ### 5. 时钟与复位
 
@@ -204,23 +204,20 @@ end
 
 | 检查项 | 说明 | 级别 |
 |---|---|---|
-| 禁止内联 `*` 乘法 | 乘法必须使用 `agdc_mul_pipe` / `agdc_mul_pipe_s` 实例 | Error |
-| 禁止内联 `/` 除法 | 除法必须使用 `agdc_div_pipe` 实例 | Error |
-| 禁止手写迭代除法器 | 恢复余数/非恢复余数等迭代除法器应替换为 `agdc_div_pipe` + 序列器 | Error |
-| 禁止手工时钟门控 | 时钟门控必须使用 `agdc_clk_gate` 封装 | Error |
+| 禁止内联 `*` 乘法 | 乘法必须使用 `mul_pipe` / `mul_pipe_s` 实例 | Error |
+| 禁止内联 `/` 除法 | 除法必须使用 `div_pipe` 实例 | Error |
+| 禁止手写迭代除法器 | 恢复余数/非恢复余数等迭代除法器应替换为 `div_pipe` + 序列器 | Error |
+| 禁止手工时钟门控 | 时钟门控必须使用 `clk_gate` 封装 | Error |
 | 未用输出留空连接 | 封装模块未用输出端口留空连接 `.port()`，禁止声明 `_nc`/`_unused` 信号 | Warning |
 | P_LATENCY 一致性 | 封装实例的 P_LATENCY 与上下文流水线匹配 | Warning |
-| 有符号乘法用 `_s` | 有符号乘法必须使用 `agdc_mul_pipe_s`，而非 `agdc_mul_pipe` | Error |
-| 条件编译宏完整 | 封装模块内 `ifdef` 宏命名符合 `AGDC_USE_FOUNDRY_*` 规范 | Info |
+| 有符号乘法用 `_s` | 有符号乘法必须使用 `mul_pipe_s`，而非 `mul_pipe` | Error |
+| 条件编译宏完整 | 封装模块内 `ifdef` 宏命名符合 `USE_FOUNDRY_*` 规范 | Info |
 
 **封装模块速查**：
 
 | 模块 | 文件 | 用途 | 关键参数 |
 |------|------|------|----------|
-| `agdc_div_pipe` | rtl/std_cell/agdc_div_pipe.v | 流水线除法器 | P_WIDTH_N, P_WIDTH_D, P_LATENCY, P_CEIL |
-| `agdc_mul_pipe` | rtl/std_cell/agdc_mul_pipe.v | 无符号乘法器 | P_WIDTH_A, P_WIDTH_B, P_LATENCY |
-| `agdc_mul_pipe_s` | rtl/std_cell/agdc_mul_pipe_s.v | 有符号乘法器 | P_WIDTH_A, P_WIDTH_B, P_LATENCY |
-| `agdc_clk_gate` | rtl/std_cell/agdc_clk_gate.v | 时钟门控 | 无参数 |
+
 
 **违规示例与修正**：
 
