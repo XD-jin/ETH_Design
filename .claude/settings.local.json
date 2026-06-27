@@ -13,7 +13,11 @@
       "TodoWrite",
       "Task(*)",
       "Skill(*)",
-      "mcp__github__*"
-    ]
+      "mcp__github__*",
+      "EnterPlanMode",
+      "ExitPlanMode",
+      "AskUserQuestion"
+    ],
+    "defaultMode": "acceptEdits"
   }
 }

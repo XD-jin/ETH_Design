@@ -1,35 +1,72 @@
 ---
 name: consistency-check
-description: 检查 RTL 代码与设计规格文档的一致性（寄存器、接口、功能、时钟复位），报告不匹配项
+description: 检查 RTL 内部一致性（端口/连线/参数）以及 RTL 与设计规格文档的一致性（寄存器/接口/功能/时钟复位），报告不匹配项
 triggers:
   - 规格一致性
+  - 端口检查
   - 一致性检查
   - spec check
   - consistency check
   - RTL vs spec
+  - 连线检查
+  - 参数检查
 ---
 
-# Consistency Check — RTL 与设计规格一致性检查
+# Consistency Check — RTL 内部一致性 & 规格一致性检查
 
-将 RTL 代码与设计规格文档进行对照，逐项检查一致性。输出不匹配清单和修复建议。
+两层检查：
+1. **RTL 内部一致性** — 模块间端口连接、位宽匹配、参数默认值
+2. **外部规格一致性** — RTL vs 设计文档（寄存器/接口/功能/时钟复位）
 
 ## 输入
 
 - RTL 代码文件（.v / .sv，路径或目录）
-- 设计规格文档（Markdown / JSON）
-- 配置参数（可选）
+- 设计规格文档（Markdown / JSON，可选）
+- spec-parser 输出的 JSON（可选）
 
 ## 输出
 
 - 一致性报告（Markdown）
-- 不匹配清单：Register / Interface / Feature / Clock-Reset 四类
+- 不匹配清单：Internal / Register / Interface / Feature / Clock-Reset 五类
 - 修复建议
 
-## 检查维度
+---
 
-### 1. 寄存器一致性 (Register)
+## 维度 A: RTL 内部一致性 (Internal)
 
-检查 RTL 中的 `parameter` 和寄存器位域是否与规格文档中的 Register Map 一致。
+### A1. 端口声明一致性
+
+| 检查项 | 说明 | 级别 |
+|--------|------|------|
+| 端口方向匹配 | output 端口不能连接到另一个 output；input 不能连接到 input（同名对接时方向相反） | Error |
+| 端口位宽匹配 | 连接的双方端口位宽必须一致（允许 `[N:0]` ↔ `[N:0]`，禁止 `[7:0]` → `[3:0]`） | Error |
+| 端口类型匹配 | wire 连接到 reg 时，源端必须是 reg 或 wire（target 端不做限制） | Error |
+| 悬空输入 | input 端口不能长期悬空（必须由顶层或内部逻辑驱动） | Warning |
+| 未用输出 | output 端口未连接时应使用 `.port()` 留空，禁止声明 `_nc` 信号 | Info |
+
+### A2. 连线正确性
+
+| 检查项 | 说明 | 级别 |
+|--------|------|------|
+| 单驱动原则 | 每个 wire/reg 信号只能有一个驱动源（禁止多个 always 块或 assign 驱动同一信号） | Error |
+| 命名端口连接 | 实例化必须使用 `.port_name(signal)` 命名连接，禁止位置连接 | Error |
+| 位宽截断 | 宽信号连到窄端口时，高位被截断（工具 Warning，需显式处理） | Warning |
+| 跨域信号有同步器 | 跨越不同 `clk` 域的控制信号必须有 2-FF 同步器或 async_fifo | Error |
+| 内部生成时钟 | 禁止用寄存器输出作为时钟（`assign clk_out = reg_signal`），必须使用 PLL 或 clk_gate 原语 | Error |
+
+### A3. 参数一致性
+
+| 检查项 | 说明 | 级别 |
+|--------|------|------|
+| 参数传递完整 | 顶层 parameter 值是否传递到所有依赖该参数的子模块 | Warning |
+| 默认值一致 | 同一 parameter 在多个模块中的默认值是否一致 | Warning |
+| 参数位宽推导 | `localparam` 中位宽表达式推导结果是否与实例化端口位宽匹配 | Error |
+
+---
+
+## 维度 B: 寄存器一致性 (Register) — RTL vs Spec
+
+检查 RTL 中的 register file 与规格文档中的 Register Map 一致。
 
 | 检查项 | 说明 | 级别 |
 |--------|------|------|
@@ -38,31 +75,18 @@ triggers:
 | 读写属性一致 | RO / RW / RC / W1C 等与规格一致 | Warning |
 | 保留位处理 | RSVD 位是否可读写（应为 RO 或硬件忽略） | Info |
 
-**检查方法**：
-1. 读取 Spec 中的 Register Map 表
-2. 在 RTL 中 grep 对应的 `localparam ADDR_xxx` 或 case 语句
-3. 逐寄存器对比 Base Address、Offset、Bit fields
-
-### 2. 接口一致性 (Interface)
-
-检查 RTL 模块的端口定义是否与规格文档中的接口描述一致。
+## 维度 C: 接口一致性 (Interface) — RTL vs Spec
 
 | 检查项 | 说明 | 级别 |
 |--------|------|------|
-| 端口名称匹配 | RTL port 名与 Spec 中的信号名一致（允许 `_i`/`_o` 后缀差异） | Error |
+| 端口名称匹配 | RTL port 名与 Spec 中的信号名一致（允许 `_i`/`_o`/`_in`/`_out` 后缀差异） | Error |
 | 端口方向匹配 | input/output/inout 与 Spec 一致 | Error |
-| 端口位宽匹配 | 位宽与 Spec 一致（Spec 中的 `[N:0]` vs RTL 中的实际值） | Error |
+| 端口位宽匹配 | 位宽与 Spec 一致 | Error |
 | 缺少端口 | Spec 中定义了但 RTL 中不存在的端口 | Error |
 | 多余端口 | RTL 中存在但 Spec 中未定义的额外端口 | Warning |
+| 协议信号完整 | AHB/AXI/APB 等标准协议信号是否完整（如 AHB 必须有 hready/hresp） | Error |
 
-**检查方法**：
-1. 从 Spec 的界面描述章节提取信号表
-2. 解析 RTL 的 `module ... (input/output ...)` 端口声明
-3. 两边做 diff
-
-### 3. 功能特性一致性 (Feature)
-
-检查 Spec 中声明的功能是否在 RTL 中实现，以及 RTL 中的实现是否符合 Spec 描述。
+## 维度 D: 功能特性一致性 (Feature) — RTL vs Spec
 
 | 检查项 | 说明 | 级别 |
 |--------|------|------|
@@ -72,14 +96,7 @@ triggers:
 | 中断源一致 | RTL 中断源数量/编号与 Spec 中断表一致 | Error |
 | Parameter 一致 | RTL parameter 的默认值与 Spec 推荐值一致 | Warning |
 
-**检查方法**：
-1. 从 Spec 的 Features 列表提取功能清单
-2. 在 RTL 中搜索对应模块、FSM 状态、中断信号
-3. 确认每个功能的实现完整性
-
-### 4. 时钟复位一致性 (Clock & Reset)
-
-检查 RTL 中的时钟域划分和复位策略是否与 Spec 中的 Clock & Reset 章节一致。
+## 维度 E: 时钟复位一致性 (Clock & Reset) — RTL vs Spec
 
 | 检查项 | 说明 | 级别 |
 |--------|------|------|
@@ -89,82 +106,92 @@ triggers:
 | CDC 策略一致 | 跨域路径的同步方法与 Spec 的 CDC 策略一致 | Error |
 | SHELL_MODE 存在 | 每个模块是否有 P_SHELL_MODE 参数 | Info |
 
-**检查方法**：
-1. 从 Spec 的 Clock Domains 表和 CDC 策略提取时钟规划
-2. 在 RTL 中 grep `input.*clk` 和 `always @(posedge`
-3. 检查 async_fifo / sync_2ff 等 CDC 模块的实例位置
-
 ---
 
 ## 执行流程
 
-### Step 1: 定位规格文档
+### Step 1: 收集输入
 
-在 `doc/` 目录中搜索规格文档（Markdown / JSON）：
+- 扫描 `rtl/` 目录收集所有 `.v` / `.sv` 文件
+- 若提供规格文档，搜索 `doc/` 目录（默认: `ETH_MAC_IP_Specification.md`）
+- 若有 spec-parser JSON 输出，优先使用其结构化数据
+
+### Step 2: 内部一致性检查
+
+解析每个模块的端口声明和实例化连接：
+1. 建立模块端口数据库（名称、方向、位宽、类型）
+2. 追踪顶层端口 → 子模块端口 → 内部信号的连接链
+3. 检查位宽匹配、方向匹配、单驱动、跨域同步
+
+### Step 3: 外部规格检查（有 Spec 时）
+
+1. **Register Map** → RTL 地址译码对比
+2. **Interface Signals** → 端口名/方向/位宽 diff
+3. **Feature List** → RTL 模块/FSM/中断 grep 确认
+4. **Clock/Reset** → 时钟域、CDC 策略对比
+
+### Step 4: 生成报告
+
+五维度不匹配清单 + 修复建议。
+
+---
+
+## 示例输出
+
+### Pass 示例 — 位宽/方向匹配
 
 ```
-默认搜索: doc/ETH_MAC_IP_Specification.md
-备选: doc/*spec*.md, doc/*Specification*.md
+✅ ETH_MAC_TOP.u_mtl_tx.ati_data[31:0] ← DMA_CONTROLLER.ati_data[31:0]
+   Direction: DMA output → MTL input  OK
+   Width: 32-bit = 32-bit  OK
 ```
 
-### Step 2: 提取规格信息
+### Fail 示例 — 缺失连接
 
-从规格文档中提取：
-- **Register Map**: 寄存器名称、偏移、位域表
-- **Interface Signals**: 顶层接口信号表（名称、方向、位宽）
-- **Feature List**: 功能特性清单
-- **Clock/Reset**: 时钟域表和 CDC 策略
-
-### Step 3: 扫描 RTL 代码
-
-从 RTL 代码中提取：
-- **Parameters & Localparams**: 寄存器地址定义、位宽参数
-- **Module Ports**: 每个模块的端口声明
-- **FSM States**: 状态机状态编码
-- **Clock/Reset Signals**: 时钟和复位信号列表
-
-### Step 4: 逐项对比
-
-四维度的每一项逐一对比，生成不匹配清单。
-
-### Step 5: 生成报告
-
-输出 Markdown 格式的一致性检查报告。
+```
+❌ [ERR-C03] MTL_RX 模块端口未连接
+   Port: rx_overflow → top-level wire rx_overflow_sts
+   状态: 端口留空 .rx_overflow()
+   影响: MTL_RxQ_Missed_Pkt 寄存器始终读回 0
+   修复: .rx_overflow(rx_overflow_sts)
+```
 
 ---
 
 ## 报告模板
 
 ```markdown
-# RTL-Spec 一致性检查报告
+# Consistency Check Report
 
-## 基本信息
-- 规格文档: xxx.md
-- RTL 目录: rtl/
-- 检查日期: YYYY-MM-DD
-- 模块数量: N
+## Summary
 
-## 汇总
+| Dimension | Error | Warning | Info |
+|-----------|-------|---------|------|
+| Internal: Port Decl | -- | -- | -- |
+| Internal: Connection | -- | -- | -- |
+| Internal: Parameter | -- | -- | -- |
+| Spec: Register | -- | -- | -- |
+| Spec: Interface | -- | -- | -- |
+| Spec: Feature | -- | -- | -- |
+| Spec: Clock/Reset | -- | -- | -- |
+| **Total** | -- | -- | -- |
 
-| 维度 | 匹配 | 不匹配 | Error | Warning | Info |
-|------|------|--------|-------|---------|------|
-| 寄存器 | -- | -- | -- | -- | -- |
-| 接口 | -- | -- | -- | -- | -- |
-| 功能 | -- | -- | -- | -- | -- |
-| 时钟复位 | -- | -- | -- | -- | -- |
-| **总计** | -- | -- | -- | -- | -- |
+## Issue Details
 
-## 不匹配详情
+### [ERR-I01] 位宽不匹配
+- 位置: top.v:156
+- 源: fifo.data_out[7:0] → 目标: mac.data_in[15:0]
+- 修复: 补齐高位或截断
 
 ### [ERR-C01] 寄存器地址缺失
-- Spec 定义: MAC_Configuration @ 0x0000
-- RTL 实际: 未找到地址译码
-- 建议: 在 ahb_slave_if 或 register file 中添加 0x0000 的 case
+- Spec: MAC_Configuration @ 0x0000
+- RTL: 未找到译码
+- 修复: 添加 case 分支
 
-## 修复优先级
-1. Error — 必须修复（功能缺陷）
-2. Warning — 建议修复（文档/实现不一致）
-3. Info — 可选（优化建议）
+## Priority
+1. Error — 必须修复
+2. Warning — 建议修复
+3. Info — 可选
 ```
 
 ---
@@ -174,12 +201,12 @@ triggers:
 ```
 Spec 文档
     │
-    ├── rtl-generator ──► RTL 代码
+    ├── spec_parser ──► JSON ──► rtl-generator ──► RTL
     │
-    └── consistency_check ──► 检查 RTL vs Spec
+    └── consistency_check ──► Internal + External 一致性报告
             │
             ▼
-        rtl-reviewer ──► 综合评审报告
+        rtl-reviewer ──► 综合评审报告 (合并一致性结果)
 ```
 
 当 `rtl-reviewer` 检测到设计规格引用时，自动调用 `consistency_check`。
