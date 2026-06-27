@@ -54,7 +54,7 @@ module mtl_tx #(
 
     // Read-side signals per queue
     wire       rd_en_q0, rd_en_q1;
-    wire [7:0] rd_data_q0, rd_data_q1;
+    wire [31:0] rd_data_q0, rd_data_q1;
     wire       empty_q0, empty_q1;
     wire       rd_sop_q0, rd_sop_q1;
     wire       rd_eop_q0, rd_eop_q1;

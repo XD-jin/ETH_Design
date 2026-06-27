@@ -16,7 +16,7 @@ module dma_controller #(
     // CSR register inputs (global)
     input  wire [31:0] cfg_dma_mode,
     input  wire [31:0] cfg_dma_sysbus_mode,
-    input  wire [31:0] cfg_dma_intr_enable,
+    input  wire [ 3:0] cfg_dma_intr_enable,
     input  wire [15:0] cfg_coalesce_timer,
 
     // Channel 0 TX control
@@ -38,7 +38,7 @@ module dma_controller #(
     output wire [31:0] ahb_addr,
     output wire [31:0] ahb_wdata,
     input  wire [31:0] ahb_rdata,
-    output wire [ 3:0] ahb_burst,
+    output wire [ 2:0] ahb_burst,
     output wire        ahb_write,
     input  wire        ahb_ready,
     input  wire        ahb_error,
@@ -75,8 +75,8 @@ module dma_controller #(
     wire [31:0] tx0_ahb_addr, tx1_ahb_addr;
     wire [31:0] rx0_ahb_addr, rx1_ahb_addr;
     wire [31:0] rx0_ahb_wdata, rx1_ahb_wdata;
-    wire [ 3:0] tx0_ahb_burst, tx1_ahb_burst;
-    wire [ 3:0] rx0_ahb_burst, rx1_ahb_burst;
+    wire [ 2:0] tx0_ahb_burst, tx1_ahb_burst;
+    wire [ 2:0] rx0_ahb_burst, rx1_ahb_burst;
     wire        tx0_ahb_req, tx1_ahb_req;
     wire        rx0_ahb_req, rx1_ahb_req;
     wire        tx0_ahb_write, tx1_ahb_write;
@@ -242,7 +242,7 @@ module dma_controller #(
             assign ahb_req    = 1'b0;
             assign ahb_addr   = 32'd0;
             assign ahb_wdata  = 32'd0;
-            assign ahb_burst  = 4'd0;
+            assign ahb_burst  = 3.d0;
             assign ahb_write  = 1'b0;
             assign ati_val    = 1'b0;
             assign ati_data   = 32'd0;

@@ -24,7 +24,7 @@ module dma_tx_channel #(
     output wire        ahb_req,               // Request AHB bus
     input  wire        ahb_grant,             // Bus granted
     output wire [31:0] ahb_addr,              // Read address
-    output wire [ 3:0] ahb_burst,             // Burst length
+    output wire [ 2:0] ahb_burst,             // Burst length
     input  wire [31:0] ahb_rdata,             // Read data
     input  wire        ahb_ready,             // Data valid
     input  wire        ahb_error,             // Bus error

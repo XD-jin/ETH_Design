@@ -26,7 +26,7 @@ module dma_rx_channel #(
     input  wire        ahb_grant,
     output wire [31:0] ahb_addr,
     output wire [31:0] ahb_wdata,
-    output wire [ 3:0] ahb_burst,
+    output wire [ 2:0] ahb_burst,
     input  wire        ahb_ready,
     input  wire [31:0] ahb_rdata,   // Read data from AHB
     input  wire        ahb_error,
