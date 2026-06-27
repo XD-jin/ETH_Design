@@ -169,33 +169,36 @@ module tb_eth_mac_top;
     reg [31:0] mem_addr_d1;            // registered address for read latency
     reg        mem_read_active;
 
+    // AHB read state: latches address in Phase1, returns data in Phase2
+    // Handles the fact that HTRANS returns to IDLE during data phase
+    reg        mem_read_pending;          // Read was started, waiting to return data
+
     always @(posedge hclk or negedge hresetn) begin
         if (!hresetn) begin
-            dma_hm_ready    <= 1'b1;
-            dma_hm_resp     <= 1'b0;
-            dma_hm_rdata    <= 32'd0;
-            mem_read_active <= 1'b0;
-            mem_addr_d1     <= 32'd0;
+            dma_hm_ready     <= 1'b1;
+            dma_hm_resp      <= 1'b0;
+            dma_hm_rdata     <= 32'd0;
+            mem_read_active  <= 1'b0;
+            mem_read_pending <= 1'b0;
+            mem_addr_d1      <= 32'd0;
         end else begin
+            // Phase 1: Capture address when HTRANS=NONSEQ/SEQ
             if (dma_hm_trans[1]) begin
                 if (dma_hm_write) begin
-                    // DMA write
                     mem[dma_hm_addr[17:2]] <= dma_hm_wdata;
                     dma_hm_ready <= 1'b1;
-                    dma_hm_resp  <= 1'b0;
                 end else begin
-                    // DMA read — 1 cycle latency for memory access
-                    if (!mem_read_active) begin
-                        mem_addr_d1     <= dma_hm_addr;
-                        mem_read_active <= 1'b1;
-                        dma_hm_ready    <= 1'b0;
-                    end else begin
-                        dma_hm_rdata    <= mem[mem_addr_d1[17:2]];
-                        dma_hm_ready    <= 1'b1;
-                        dma_hm_resp     <= 1'b0;
-                        mem_read_active <= 1'b0;
-                    end
+                    // Latch address, prepare data for next cycle
+                    mem_addr_d1      <= dma_hm_addr;
+                    mem_read_pending <= 1'b1;
+                    dma_hm_ready     <= 1'b0;     // Wait state
                 end
+            // Phase 2: Return read data (HTRANS may already be IDLE)
+            end else if (mem_read_pending) begin
+                dma_hm_rdata     <= mem[mem_addr_d1[17:2]];
+                dma_hm_ready     <= 1'b1;          // Data valid
+                dma_hm_resp      <= 1'b0;
+                mem_read_pending <= 1'b0;
             end else begin
                 dma_hm_ready <= 1'b1;
                 dma_hm_resp  <= 1'b0;
@@ -262,10 +265,11 @@ module tb_eth_mac_top;
         tdes0 = buf1_addr;
         // TDES1: Buffer 2 Address (unused)
         tdes1 = 32'd0;
-        // TDES2: IOC | BUF2_LEN=0 | BUF1_LEN
-        tdes2 = {ioc, 1'b0, 8'd0, 2'd0, buf1_len};
-        // TDES3: OWN=1 | FD=1 | LD=1 (single descriptor per packet) | CPC=00 | Frame Length
-        tdes3 = {1'b1, 1'b0, 1'b1, 1'b1, 2'b00, 3'b000, 4'd0, 1'b0, 2'b00, 1'b0, buf1_len};
+        // TDES2: {IOC[31], TTSE[30], B2L[29:16], VTIR[15:14], B1L[13:0]}
+        tdes2 = {ioc, 1'b0, 14'd0, 2'b00, buf1_len[13:0]};
+        // TDES3: {OWN[31], CTXT[30], FD[29], LD[28], CPC[27:26], SAIC[25:23],
+        //         THL[22:19], TSE[18], CIC[17:16], TPL[15], FL[14:0]}
+        tdes3 = {1'b1, 1'b0, 1'b1, 1'b1, 2'b00, 3'b000, 4'd0, 1'b0, 2'b00, 1'b0, buf1_len[14:0]};
 
         // Write descriptor to memory (word by word)
         // mem is accessed by DMA via hm_addr[17:2], so 32-bit word aligned
@@ -411,7 +415,7 @@ module tb_eth_mac_top;
         // 1.2 Configure MAC_Configuration (0x0000):
         //     TE=1, RE=1, DM=1 (full-duplex), PS=1 (1000M), IFG=00 (96bit)
         //     Bits: [16]JE=0 [14]CST=0 [9]PS=1 [8]DM=1 [6:5]IFG=00 [4]JD=0 [3]TE=1 [2]RE=1
-        ahb_write(13'h000, {16'd0, 1'b0, 1'b0, 2'd0, 1'b0, 1'b1, 1'b1, 1'b0, 2'd0, 1'b0, 1'b1, 1'b1, 1'b0, 1'b0, 1'b0});
+        ahb_write(13'h000, 32'h0000_030C);   // MAC_Configuration: TE=1,RE=1,DM=1,PS=1
         ahb_read(13'h000, rdata);
         check_equal("MAC_Config[3] TE", rdata[3], 1'b1);
         check_equal("MAC_Config[2] RE", rdata[2], 1'b1);
