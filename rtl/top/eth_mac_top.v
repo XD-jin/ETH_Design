@@ -228,7 +228,7 @@ module eth_mac_top #(
         .dma_mode             (cfg_dma_mode),
         .dma_sysbus_mode      (cfg_dma_sysbus_mode),
         .dma_intr_enable      (cfg_dma_intr_en),
-        .dma_intr_status      (),
+        .dma_intr_status      (dma_intr_status_w),
         .dma_tx_intr_timer    (cfg_dma_tx_intr_timer),
         .dma_rx_intr_timer    (cfg_dma_rx_intr_timer),
         .dma_ch0_ctrl         (cfg_dma_ch0_ctrl),
@@ -238,7 +238,7 @@ module eth_mac_top #(
         .dma_ch0_rx_desc_addr (cfg_dma_ch0_rx_desc_addr),
         .dma_ch0_tx_desc_tail (cfg_dma_ch0_tx_tail),
         .dma_ch0_rx_desc_tail (cfg_dma_ch0_rx_tail),
-        .dma_ch0_status       (dma_ch0_status_w),
+        .dma_ch0_status       (dma_ch0_status_int),
         .dma_ch1_ctrl         (cfg_dma_ch1_ctrl),
         .dma_ch1_tx_ctrl      (cfg_dma_ch1_tx_ctrl),
         .dma_ch1_rx_ctrl      (cfg_dma_ch1_rx_ctrl),
@@ -246,19 +246,16 @@ module eth_mac_top #(
         .dma_ch1_rx_desc_addr (cfg_dma_ch1_rx_desc_addr),
         .dma_ch1_tx_desc_tail (cfg_dma_ch1_tx_tail),
         .dma_ch1_rx_desc_tail (cfg_dma_ch1_rx_tail),
-        .dma_ch1_status       (dma_ch1_status_w),
+        .dma_ch1_status       (dma_ch1_status_int),
         .mac_version          (mac_version_w)
     );
 
-    // Status wire tie-offs (connected when sub-modules assert actual values)
-    assign mac_intr_status_w = 4'd0;
-    assign mtl_intr_status_w = 32'd0;
-    assign mtl_txq0_uf_w     = 32'd0;
-    assign mtl_txq1_uf_w     = 32'd0;
-    assign mtl_rxq0_mp_w     = 32'd0;
-    assign mtl_rxq1_mp_w     = 32'd0;
-    assign dma_ch0_status_w  = 32'd0;
-    assign dma_ch1_status_w  = 32'd0;
+    // Status wire tie-offs — replaced with actual sub-module connections below
+    wire tx_frame_done, tx_underflow_sts, tx_jabber_sts;
+    wire rx_frame_done, rx_crc_error_sts, rx_recv_error_sts, rx_watchdog_error_sts;
+    wire rx_overflow_sts;
+    wire [ 3:0] dma_intr_status_w;
+    wire [31:0] dma_ch0_status_int, dma_ch1_status_int;
 
     //--------------------------------------------------------------------------
     // DMA Controller
@@ -317,8 +314,29 @@ module eth_mac_top #(
         .ari_eop            (ari_eop),
         .ari_queue          (ari_queue),
         .intr_o             (intr_o),
-        .intr_status        ()
+        .intr_status        (dma_intr_status_w)
     );
+
+    //--------------------------------------------------------------------------
+    // Status Register Assembly
+    //--------------------------------------------------------------------------
+    // MAC Interrupt Status: {TS[3], RSVD[2], PC[1], RO[0]}
+    assign mac_intr_status_w = {tx_frame_done, 1'b0,
+                                rx_pause_detected, rx_overflow_sts};
+
+    // MTL Interrupt Status: simplified — TX underflow + RX overflow
+    assign mtl_intr_status_w = {28'd0, 1'b0, tx_underflow_sts,
+                                rx_overflow_sts, 1'b0};
+
+    // MTL per-queue underflow/missed (simplified — counters not implemented)
+    assign mtl_txq0_uf_w = {31'd0, tx_underflow_sts};
+    assign mtl_txq1_uf_w = 32'd0;
+    assign mtl_rxq0_mp_w = {31'd0, rx_overflow_sts};
+    assign mtl_rxq1_mp_w = 32'd0;
+
+    // DMA channel status (simplified — status from intr_status bits)
+    assign dma_ch0_status_int = {28'd0, dma_intr_status_w[1:0], 2'd0};
+    assign dma_ch1_status_int = {28'd0, dma_intr_status_w[3:2], 2'd0};
 
     //--------------------------------------------------------------------------
     // MTL — MAC Transaction Layer
@@ -370,7 +388,7 @@ module eth_mac_top #(
         .ari_queue         (ari_queue),
         .rx_queue_not_empty (),
         .rx_fifo_level     (),
-        .rx_overflow       ()
+        .rx_overflow       (rx_overflow_sts)
     );
 
     //--------------------------------------------------------------------------
@@ -399,9 +417,9 @@ module eth_mac_top #(
         .gmii_txd         (mac_txd),
         .gmii_tx_en       (mac_tx_en),
         .gmii_tx_er       (mac_tx_er),
-        .tx_frame_done    (),
-        .tx_underflow     (),
-        .tx_jabber        ()
+        .tx_frame_done    (tx_frame_done),
+        .tx_underflow     (tx_underflow_sts),
+        .tx_jabber        (tx_jabber_sts)
     );
 
     mac_rx #(.P_SHELL_MODE(P_SHELL_MODE))
@@ -433,10 +451,10 @@ module eth_mac_top #(
         .rx_pause_detected (rx_pause_detected),
         .rx_pause_time     (rx_pause_time),
         .rx_packet_len     (),
-        .rx_crc_error      (),
-        .rx_recv_error     (),
-        .rx_watchdog_error (),
-        .rx_frame_done     ()
+        .rx_crc_error      (rx_crc_error_sts),
+        .rx_recv_error     (rx_recv_error_sts),
+        .rx_watchdog_error (rx_watchdog_error_sts),
+        .rx_frame_done     (rx_frame_done)
     );
 
     //--------------------------------------------------------------------------
