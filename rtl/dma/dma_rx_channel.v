@@ -219,7 +219,7 @@ module dma_rx_channel #(
             //------------------------------------------------------------------
             // AHB request and address
             //------------------------------------------------------------------
-            assign ahb_req   = (curr_st == ST_FETCH_DESC) || (curr_st == ST_WRITE_BUF) || (curr_st == ST_WRITEBACK);
+            assign ahb_req   = ahb_grant && ((curr_st == ST_FETCH_DESC) || (curr_st == ST_WRITE_BUF) || (curr_st == ST_WRITEBACK));
             assign ahb_addr  = (curr_st == ST_FETCH_DESC) ? desc_addr :
                                (curr_st == ST_WRITEBACK)  ? (desc_addr + 32'd12) :
                                (active_buf ? buf2_addr + byte_in_buf : buf1_addr + byte_in_buf);

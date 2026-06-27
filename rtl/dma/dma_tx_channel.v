@@ -115,10 +115,10 @@ module dma_tx_channel #(
             //------------------------------------------------------------------
             always @(*) begin
                 case (curr_st)
-                    ST_IDLE:  next_st = ch_start ? ST_DESC0 : ST_IDLE;
-                    ST_DESC0: next_st = ahb_ready ? ST_DESC1 : ST_DESC0;
-                    ST_DESC1: next_st = ahb_ready ? ST_DESC2 : ST_DESC1;
-                    ST_DESC2: next_st = ahb_ready ? ST_DESC3 : ST_DESC2;
+                    ST_IDLE:  next_st = (ch_start && ahb_grant) ? ST_DESC0 : ST_IDLE;
+                    ST_DESC0: next_st = (ahb_ready && ahb_grant) ? ST_DESC1 : ST_DESC0;
+                    ST_DESC1: next_st = (ahb_ready && ahb_grant) ? ST_DESC2 : ST_DESC1;
+                    ST_DESC2: next_st = (ahb_ready && ahb_grant) ? ST_DESC3 : ST_DESC2;
                     ST_DESC3: begin
                         if (ahb_ready) begin
                             if (own_bit)
@@ -247,7 +247,8 @@ module dma_tx_channel #(
             wire in_xfer_phase;
             assign in_xfer_phase = (curr_st == ST_XFER);
 
-            assign ahb_req   = in_desc_phase || in_xfer_phase;
+            // Only request bus when arbiter has granted access
+            assign ahb_req   = ahb_grant && (in_desc_phase || in_xfer_phase);
             // Descriptor address increments by 4 each word; buffer address from buf1/buf2
             assign ahb_addr  = in_desc_phase ? desc_addr :
                                (active_buf ? buf2_addr + byte_cnt : buf1_addr + byte_cnt);
